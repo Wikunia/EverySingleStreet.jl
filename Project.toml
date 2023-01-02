@@ -13,6 +13,7 @@ NearestNeighbors = "b8a86587-4115-5ab1-83bc-aa920d37bbce"
 Polyline = "737ade88-6689-11e9-2266-a1567ed38d42"
 
 [compat]
+LightOSM = "0.2"
 julia = "1"
 
 [extras]
