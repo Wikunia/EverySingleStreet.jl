@@ -45,11 +45,50 @@ function parse_map(fpath)
 end
 
 function parse_gpx(fpath)
-    gpxFile = readGPX(fpath)
-    mat = parseGPX(gpxFile)
-    return [LLA(p...) for p in eachrow(mat)]
+    gpxFile = read_gpx_file(fpath)
+    @assert length(gpxFile.tracks) == 1
+    @assert length(gpxFile.tracks[1].segments) == 1
+
+    return [LLA(p.lat, p.lon, p.ele) for p in gpxFile.tracks[1].segments[1].points]
 end
 
+
+function combine_gpx_tracks(folder)
+    author = GPXAuthor("EverySingleStreet.jl")
+
+    metadata = GPXMetadata(
+        name="07/11/2019 LFBI (09:32) LFBI (11:34)",
+        author=author,
+        time=now(localzone())
+    )
+
+    gpx = GPXDocument(metadata)
+
+    track = new_track(gpx)
+    
+
+
+    for fname in readdir(folder)
+        splitext(fname)[2] != ".gpx" && continue
+        track_segment = new_track_segment(track)
+
+        gpxFile = read_gpx_file(joinpath(folder,fname))
+        @assert length(gpxFile.tracks) == 1
+        @assert length(gpxFile.tracks[1].segments) == 1
+    
+        for p in gpxFile.tracks[1].segments[1].points
+            point = GPXPoint(p.lat, p.lon, p.ele, p.time, p.desc)
+            push!(track_segment, point)
+        end
+    end
+
+    xdoc = XMLDocument(gpx)
+
+
+    fname = "generated.gpx"
+    save_file(xdoc, fname)
+    println("GPX file saved to \"$fname\"")
+end
 
 function readjson(fpath)
     json_string = read(fpath, String)

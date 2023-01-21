@@ -4,13 +4,16 @@ authors = ["Ole Kröger <o.kroeger@opensourc.es> and contributors"]
 version = "0.1.0"
 
 [deps]
+GPX = "b55ef746-885f-40a4-ab22-c8118be08013"
 Geodesy = "0ef565a4-170c-5f04-8de2-149903a85f3d"
 JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 LightOSM = "d1922b25-af4e-4ba3-84af-fe9bea896051"
+LightXML = "9c8b4983-aa76-5018-a973-4c85ecc9e179"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Luxor = "ae8d54c2-7ccd-5906-9d76-62fc9837b5bc"
 NearestNeighbors = "b8a86587-4115-5ab1-83bc-aa920d37bbce"
-Polyline = "737ade88-6689-11e9-2266-a1567ed38d42"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+TimeZones = "f269a46b-ccf7-5d73-abea-4c690281aa53"
 
 [compat]
 julia = "1"

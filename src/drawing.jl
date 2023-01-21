@@ -1,4 +1,5 @@
 function draw_way(way::Way, trans)
+    setopacity(0.5)
     curve = [Point(getxy_from_lat_lon(node.lat, node.lon, trans)...) for node in way.nodes]
     poly(curve, :stroke)
 end
