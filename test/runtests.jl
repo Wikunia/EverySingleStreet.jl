@@ -1,6 +1,8 @@
 using EverySingleStreet
 using Test
 
+using Geodesy
+
 @testset "EverySingleStreet.jl" begin
-    # Write your tests here.
+    include("unit/candidates.jl")
 end
