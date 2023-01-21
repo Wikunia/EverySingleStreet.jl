@@ -4,7 +4,7 @@ authors = ["Ole Kröger <o.kroeger@opensourc.es> and contributors"]
 version = "0.1.0"
 
 [deps]
-GPX = "b55ef746-885f-40a4-ab22-c8118be08013"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 Geodesy = "0ef565a4-170c-5f04-8de2-149903a85f3d"
 JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 LightOSM = "d1922b25-af4e-4ba3-84af-fe9bea896051"

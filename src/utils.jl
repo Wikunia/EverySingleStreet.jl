@@ -45,7 +45,7 @@ function parse_map(fpath)
 end
 
 function parse_gpx(fpath)
-    gpxFile = read_gpx_file(fpath)
+    gpxFile = GPX.read_gpx_file(fpath)
     @assert length(gpxFile.tracks) == 1
     @assert length(gpxFile.tracks[1].segments) == 1
 

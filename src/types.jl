@@ -16,5 +16,11 @@ struct Map
     ways::Vector{Way}
 end
 
+struct Candidate
+    lla::LLA
+    way::Way
+    dist::Float64
+    λ::Float64
+end
 
 
