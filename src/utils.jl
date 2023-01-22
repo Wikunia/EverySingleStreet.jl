@@ -41,7 +41,9 @@ function parse_map(fpath)
             way_counter += 1
         end
     end
-    return Map(nodes, ways)
+    json_string = convert_keys_recursive(json)
+    graph = graph_from_object(json_string)
+    return Map(graph, nodeid_to_local, wayid_to_local, nodes, ways)
 end
 
 function parse_gpx(fpath)
@@ -103,4 +105,69 @@ function get_centroid(nodes::Vector{Node})
     lon = mean(node.lon for node in nodes)
     lat = mean(node.lat for node in nodes)
     return LLA(lat, lon)
+end
+
+function convert_keys_recursive(d::Dict)
+    new_d = Dict{String,Any}()
+    for (k,v) in d
+        new_d[string(k)] = convert_keys_recursive(v)
+    end
+    return new_d
+end
+
+function convert_keys_recursive(v::Vector)
+    return [convert_keys_recursive(d) for d in v]
+end
+
+convert_keys_recursive(x) = x
+
+function get_reverse_candidate(candidate::Candidate)
+    max_len = total_length(candidate.way)
+    λ = clamp(max_len-candidate.λ, 0, max_len)
+    return Candidate(
+        candidate.measured_point, 
+        candidate.lla,
+        candidate.way,
+        !candidate.way_is_reverse,
+        candidate.dist,
+        λ
+    )
+end
+
+function get_node(city_map::Map, nodeid)
+    return city_map.nodes[city_map.osm_id_to_node_id[nodeid]]
+end
+
+function get_first_way_segment(sp, city_map::Map)
+    best_way_segment = nothing
+    best_len = 0
+    for (rev,func) in zip([false, true], [identity, reverse])
+        for way in city_map.ways
+            node_ids = func([n.id for n in way.nodes])
+            start_pos_idx = findfirst(==(sp[1]), node_ids)
+            pos_idx = start_pos_idx
+            spi = 1
+            if pos_idx !== nothing && pos_idx != length(node_ids)
+                while pos_idx+1 <= length(node_ids) && spi+1 <= length(sp) && node_ids[pos_idx+1] == sp[spi+1]
+                    len = spi+1
+                    pos_idx += 1
+                    spi += 1
+                    if len > best_len
+                        best_len = len
+                        best_way_segment = (way=way, rev=rev, from=start_pos_idx, to=pos_idx)
+                    end
+                end
+            end
+        end
+    end
+    if !isnothing(best_way_segment)
+        # by default always have the last already found still in it to not have a gap
+        new_sp = sp[best_len:end]
+        # return either length at least two or an empty one
+        if length(new_sp) == 1
+            return best_way_segment, Int[]
+        end
+        return best_way_segment, new_sp
+    end
+    error("Couldn't find which contains at least the first two points of $sp directly after another")
 end

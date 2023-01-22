@@ -1,7 +1,7 @@
 @testset "Candidates" begin
 
 @testset "Single point several candidates" begin
-    city_map = EverySingleStreet.parse_map(joinpath(@__DIR__, "..", "data", "CLZ.json"))
+    city_map = EverySingleStreet.parse_map(joinpath(@__DIR__, "..", "data", "CLZ.json"));
     p = LLA(51.80665409406621, 10.335359255147063)
     candidates = EverySingleStreet.get_candidates(city_map, [p])[1]
     # check whether the following four streets have at least one candidate point
