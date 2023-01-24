@@ -42,7 +42,7 @@ function parse_map(fpath)
         end
     end
     json_string = convert_keys_recursive(json)
-    graph = graph_from_object(json_string)
+    graph = graph_from_object(json_string; weight_type=:distance)
     return Map(graph, nodeid_to_local, wayid_to_local, nodes, ways)
 end
 

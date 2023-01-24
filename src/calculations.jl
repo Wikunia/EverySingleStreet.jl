@@ -312,7 +312,7 @@ function calculate_streetpath(candidates, city_map)
         if current_candidate.way.id == next_candidate.way.id
             @assert current_candidate.way_is_reverse == next_candidate.way_is_reverse
             push!(segments, StreetSegment(current_candidate, next_candidate))
-        else 
+        else
             sp = shortest_candidate_path(current_candidate, next_candidate, city_map)
             partial_segments = get_segments(city_map, current_candidate, next_candidate, sp)
             append!(segments, partial_segments)

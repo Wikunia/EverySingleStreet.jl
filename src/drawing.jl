@@ -34,7 +34,7 @@ function draw_segment(segment::StreetSegment, trans)
     path = [segment.from.lla]
     nodes = segment.from.way.nodes
     if segment.from.way_is_reverse
-        reverse!(nodes)
+        nodes = reverse(nodes)
     end
 
     for i in prev_from_idx:prev_to_idx
@@ -48,7 +48,7 @@ end
 function prev_idx(candidate)
     nodes = candidate.way.nodes
     if candidate.way_is_reverse
-        reverse!(nodes)
+        nodes = reverse(nodes)
     end
     dists = [euclidean_distance(LLA(n1.lat, n1.lon), LLA(n2.lat, n2.lon)) for (n1,n2) in zip(nodes[1:end-1], nodes[2:end])]
     cum_dists = cumsum(dists)
@@ -57,6 +57,28 @@ function prev_idx(candidate)
         return length(cum_dists)
     end
     return pos
+end
+
+function draw_candidates(city_map, candidates, outpath, scale_factor=0.1)
+    origin_lla = get_centroid(city_map.nodes)
+    origin_lla = candidates[1].lla
+    trans = ENUfromLLA(origin_lla, wgs84)
+    Drawing(1920, 1080, outpath)
+    origin()
+    background("white")
+    Luxor.scale(scale_factor,-scale_factor)
+    sethue("black")
+    for way in city_map.ways
+        sethue("black")
+        draw_way(way, trans)
+    end
+    sethue("green")
+    for c in candidates
+        p = Point(getxy_from_lat_lon(c.lla.lat, c.lla.lon, trans))
+        circle(p, 10, :fill)
+        # draw_way(c.way, trans)
+    end
+    finish()
 end
 
 function draw_map(city_map, paths, outpath; streetpaths=Vector{StreetPath}(), scale_factor=0.1)
