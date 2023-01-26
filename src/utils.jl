@@ -35,6 +35,7 @@ function parse_map(fpath)
             node_counter += 1
         end
         if element[:type] == "way"
+            element[:tags][:oneway] = "no"
             way_nodes = [nodes[nodeid_to_local[node_id]] for node_id in element[:nodes]]
             wayid_to_local[element[:id]] = way_counter
             ways[way_counter] = Way(element[:id], way_nodes, get(element[:tags],:name, ""))
@@ -56,30 +57,30 @@ end
 
 
 function combine_gpx_tracks(folder)
-    author = GPXAuthor("EverySingleStreet.jl")
+    author = GPX.GPXAuthor("EverySingleStreet.jl")
 
-    metadata = GPXMetadata(
+    metadata = GPX.GPXMetadata(
         name="07/11/2019 LFBI (09:32) LFBI (11:34)",
         author=author,
         time=now(localzone())
     )
 
-    gpx = GPXDocument(metadata)
+    gpx = GPX.GPXDocument(metadata)
 
-    track = new_track(gpx)
+    track = GPX.new_track(gpx)
     
 
 
     for fname in readdir(folder)
         splitext(fname)[2] != ".gpx" && continue
-        track_segment = new_track_segment(track)
+        track_segment = GPX.new_track_segment(track)
 
-        gpxFile = read_gpx_file(joinpath(folder,fname))
+        gpxFile = GPX.read_gpx_file(joinpath(folder,fname))
         @assert length(gpxFile.tracks) == 1
         @assert length(gpxFile.tracks[1].segments) == 1
     
         for p in gpxFile.tracks[1].segments[1].points
-            point = GPXPoint(p.lat, p.lon, p.ele, p.time, p.desc)
+            point = GPX.GPXPoint(p.lat, p.lon, p.ele, p.time, p.desc)
             push!(track_segment, point)
         end
     end

@@ -28,6 +28,9 @@ end
 function draw_segment(segment::StreetSegment, trans)
     prev_from_idx = prev_idx(segment.from)+1
     prev_to_idx = prev_idx(segment.to)
+    if segment.from == segment.to 
+        Luxor.circle(Point(getxy_from_lat_lon(segment.from.lla.lat, segment.from.lla.lon, trans)), 5, :fill)
+    end
     if prev_from_idx > prev_to_idx
         return draw_line(segment.from.lla, segment.to.lla, trans)
     end
