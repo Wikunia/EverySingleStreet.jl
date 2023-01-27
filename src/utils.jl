@@ -7,6 +7,7 @@ Download the road network of the given place and write it as a json file to the 
 function download(place_name, filepath)
     download_osm_network(
         :place_name;
+        network_type=:walk,
         place_name,
         save_to_file_location=filepath
     )
@@ -38,12 +39,12 @@ function parse_map(fpath)
             element[:tags][:oneway] = "no"
             way_nodes = [nodes[nodeid_to_local[node_id]] for node_id in element[:nodes]]
             wayid_to_local[element[:id]] = way_counter
-            ways[way_counter] = Way(element[:id], way_nodes, get(element[:tags],:name, ""))
+            ways[way_counter] = Way(element[:id], way_nodes, get(element[:tags],:name, ""), get(element[:tags],:highway, ""))
             way_counter += 1
         end
     end
     json_string = convert_keys_recursive(json)
-    graph = graph_from_object(json_string; weight_type=:distance)
+    graph = graph_from_object(json_string; weight_type=:distance, network_type=:walk)
     return Map(graph, nodeid_to_local, wayid_to_local, nodes, ways)
 end
 

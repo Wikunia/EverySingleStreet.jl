@@ -9,6 +9,7 @@ struct Way
     id::Int
     nodes::Vector{Node}
     name::String
+    highway::String
 end
 
 struct Map

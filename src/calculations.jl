@@ -102,12 +102,13 @@ end
 
 function filter_candidates!(candidates)
     isempty(candidates) && return candidates
-    # if there are candidates which are closer than 50m drop all further away
+    closer_dist = 25
+    # if there are candidates which are closer than closer_dist0m drop all further away
     min_dist = minimum(c.dist for c in candidates)
-    if min_dist > 50
+    if min_dist > closer_dist
         return candidates
     end
-    filter!(c->c.dist <= 50, candidates)
+    filter!(c->c.dist <= closer_dist, candidates)
 end
 
 """
@@ -251,7 +252,7 @@ function get_candidates_from_idx(vec_candidates, candidate_idxs)
 end
 
 function map_path(city_map, path)
-    path = filter_path(path, 10)
+    path = filter_path(path, 25)
     vec_candidates = EverySingleStreet.get_candidates(city_map, path)
     val, idx = findmin(length.(vec_candidates))
     if val == 0
