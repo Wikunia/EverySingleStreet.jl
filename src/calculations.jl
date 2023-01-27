@@ -24,15 +24,16 @@ function point_linesegment_distance(p::Point, a::Point, b::Point)
 	return norm(p_on_ab-p)
 end
 
-function get_candidate_on_way(city_map, p, way::Way, trans, rev_trans)
+function get_candidate_on_way(city_map, p, way::Way, trans, rev_trans; rev=false)
     lp = Point(getxy_from_lat_lon(p.lat, p.lon, trans)...)
     min_dist = Inf
     best_candidate = nothing
     cλ = 0.0
     max_λ = total_length(way)
-    for i in 1:length(way.nodes)-1
-        w1 = way.nodes[i]
-        w2 = way.nodes[i+1]
+    nodes = rev ? reverse(way.nodes) : way.nodes
+    for i in 1:length(nodes)-1
+        w1 = nodes[i]
+        w2 = nodes[i+1]
         if !haskey(city_map.graph.nodes, w1.id) ||  !haskey(city_map.graph.nodes, w2.id)
             continue
         end
@@ -45,7 +46,7 @@ function get_candidate_on_way(city_map, p, way::Way, trans, rev_trans)
             p_on_ab = get_lla(get_interpolation_point(w1p, w2p, t), rev_trans)
             λ = cλ+euclidean_distance(LLA(w1.lat, w1.lon), p_on_ab)
             λ = clamp(λ, 0, max_λ)
-            best_candidate = Candidate(p, p_on_ab, way, false, dist, λ)
+            best_candidate = Candidate(p, p_on_ab, way, rev, dist, λ)
         end
         cλ += euclidean_distance(LLA(w2.lat, w2.lon), LLA(w1.lat, w1.lon))
     end
@@ -325,17 +326,21 @@ function calculate_streetpath(candidates, city_map)
 end
 
 function get_segments(city_map, current_candidate, next_candidate, sp)
+    origin_lla = get_centroid(city_map.nodes)
+    trans = ENUfromLLA(origin_lla, wgs84)
+    rev_trans = LLAfromENU(origin_lla, wgs84)
+
     segments = Vector{StreetSegment}()
     if length(sp) == 2
         nodeid = get_next_node_id(current_candidate)
         node = get_node(city_map, nodeid)
         lla = LLA(node.lat, node.lon)
-        c1 = Candidate(lla, lla, current_candidate.way, current_candidate.way_is_reverse, 0, total_length(current_candidate.way))
+        c1 = get_candidate_on_way(city_map, lla, current_candidate.way, trans, rev_trans; rev=current_candidate.way_is_reverse)
         push!(segments, StreetSegment(current_candidate, c1))
         nodeid = get_prev_node_id(next_candidate)
         node = get_node(city_map, nodeid)
         lla = LLA(node.lat, node.lon)
-        c2 = Candidate(lla, lla, next_candidate.way, next_candidate.way_is_reverse, 0, total_length(next_candidate.way))
+        c2 = get_candidate_on_way(city_map, lla, next_candidate.way, trans, rev_trans; rev=current_candidate.way_is_reverse)
         push!(segments, StreetSegment(c2, next_candidate))
         return segments
     end
@@ -344,7 +349,7 @@ function get_segments(city_map, current_candidate, next_candidate, sp)
     nodeid = get_next_node_id(current_candidate)
     node = get_node(city_map, nodeid)
     lla = LLA(node.lat, node.lon)
-    c1 = Candidate(lla, lla, current_candidate.way, current_candidate.way_is_reverse, 0, total_length(current_candidate.way))
+    c1 = get_candidate_on_way(city_map, lla, current_candidate.way, trans, rev_trans; rev=current_candidate.way_is_reverse)
     push!(segments, StreetSegment(current_candidate, c1))
 
     for way_segment in way_segments
@@ -354,25 +359,17 @@ function get_segments(city_map, current_candidate, next_candidate, sp)
         end
         node = nodes[way_segment.from]
         lla = LLA(node.lat, node.lon)
-        λ = 0.0
-        if way_segment.from != 1
-            λ = sum(euclidean_distance(LLA(n1.lat, n1.lon), LLA(n2.lat, n2.lon)) for (n1, n2) in zip(nodes[1:way_segment.from-1], nodes[2:way_segment.from]))
-        end
-        c1 = Candidate(lla, lla, way_segment.way, way_segment.rev, 0, λ)
+        c1 = get_candidate_on_way(city_map, lla, way_segment.way, trans, rev_trans; rev=current_candidate.way_is_reverse)
 
         node = nodes[way_segment.to]
         lla = LLA(node.lat, node.lon)
-        λ = 0.0
-        if way_segment.to != 1
-            λ = sum(euclidean_distance(LLA(n1.lat, n1.lon), LLA(n2.lat, n2.lon)) for (n1, n2) in zip(nodes[1:way_segment.to-1], nodes[2:way_segment.to]))
-        end
-        c2 = Candidate(lla, lla, way_segment.way, way_segment.rev, 0, λ)
+        c2 = get_candidate_on_way(city_map, lla, way_segment.way, trans, rev_trans; rev=current_candidate.way_is_reverse)
         push!(segments, StreetSegment(c1, c2))
     end
     nodeid = get_prev_node_id(next_candidate)
     node = get_node(city_map, nodeid)
     lla = LLA(node.lat, node.lon)
-    c2 = Candidate(lla, lla, next_candidate.way, next_candidate.way_is_reverse, 0, total_length(next_candidate.way))
+    c2 = get_candidate_on_way(city_map, lla, next_candidate.way, trans, rev_trans; rev=current_candidate.way_is_reverse)
     push!(segments, StreetSegment(c2, next_candidate))
     return segments
 end
