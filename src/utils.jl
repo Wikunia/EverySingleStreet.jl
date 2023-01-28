@@ -13,6 +13,10 @@ function download(place_name, filepath)
     )
 end
 
+function string_from_lla(lla::LLA)
+    return "$(lla.lat) $(lla.lon)"
+end
+
 """
     parse_map(fpath)
 

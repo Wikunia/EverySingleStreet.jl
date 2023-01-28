@@ -329,9 +329,9 @@ function get_segments(city_map, current_candidate, next_candidate, sp)
     origin_lla = get_centroid(city_map.nodes)
     trans = ENUfromLLA(origin_lla, wgs84)
     rev_trans = LLAfromENU(origin_lla, wgs84)
-
+    
     segments = Vector{StreetSegment}()
-    if length(sp) == 2
+    if length(sp) == 2 && sp[1] == sp[2]
         nodeid = get_next_node_id(current_candidate)
         node = get_node(city_map, nodeid)
         lla = LLA(node.lat, node.lon)
@@ -344,8 +344,10 @@ function get_segments(city_map, current_candidate, next_candidate, sp)
         push!(segments, StreetSegment(c2, next_candidate))
         return segments
     end
+    
 
     way_segments = get_way_segments(sp, city_map)
+
     nodeid = get_next_node_id(current_candidate)
     node = get_node(city_map, nodeid)
     lla = LLA(node.lat, node.lon)
@@ -359,17 +361,18 @@ function get_segments(city_map, current_candidate, next_candidate, sp)
         end
         node = nodes[way_segment.from]
         lla = LLA(node.lat, node.lon)
-        c1 = get_candidate_on_way(city_map, lla, way_segment.way, trans, rev_trans; rev=current_candidate.way_is_reverse)
+        c1 = get_candidate_on_way(city_map, lla, way_segment.way, trans, rev_trans; rev=way_segment.rev)
 
         node = nodes[way_segment.to]
         lla = LLA(node.lat, node.lon)
-        c2 = get_candidate_on_way(city_map, lla, way_segment.way, trans, rev_trans; rev=current_candidate.way_is_reverse)
+        c2 = get_candidate_on_way(city_map, lla, way_segment.way, trans, rev_trans; rev=way_segment.rev)
         push!(segments, StreetSegment(c1, c2))
     end
+
     nodeid = get_prev_node_id(next_candidate)
     node = get_node(city_map, nodeid)
     lla = LLA(node.lat, node.lon)
-    c2 = get_candidate_on_way(city_map, lla, next_candidate.way, trans, rev_trans; rev=current_candidate.way_is_reverse)
+    c2 = get_candidate_on_way(city_map, lla, next_candidate.way, trans, rev_trans; rev=next_candidate.way_is_reverse)
     push!(segments, StreetSegment(c2, next_candidate))
     return segments
 end
