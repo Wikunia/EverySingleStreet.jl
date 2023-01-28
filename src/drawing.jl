@@ -1,5 +1,9 @@
+get_way_opacity(::Val{:footway}) = 0.1
+get_way_opacity(::Val{:pedestrian}) = 0.1
+get_way_opacity(::Val) = 0.5
+
 function draw_way(way::Way, trans)
-    setopacity(0.5)
+    Luxor.setopacity(get_way_opacity(Val(Symbol(way.highway))))
     curve = [Point(getxy_from_lat_lon(node.lat, node.lon, trans)...) for node in way.nodes]
     poly(curve, :stroke)
 end
@@ -108,6 +112,7 @@ function draw_map(city_map, paths, outpath; streetpaths=Vector{StreetPath}(), sc
     =#
     sethue("green")
     setline(3)
+    setopacity(1)
     for streetpath in streetpaths
         draw_path(streetpath, trans)
     end
