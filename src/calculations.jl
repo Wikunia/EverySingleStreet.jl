@@ -1,29 +1,59 @@
+"""
+    getxy_from_lat_lon(lat, lon, trans)
 
-
+Return x, y position coordinates from lat and lon given a Geodesy trensformation.
+"""
 function getxy_from_lat_lon(lat, lon, trans)
     x,y,z = trans(LLA(lat, lon))
     return x,y
 end
 
+"""
+    get_lla(p, trans)
+
+Get a LLA formatted position from a point and a Geodesy transformation.
+"""
 function get_lla(p, trans)
     return trans(ENU(p...))
 end
 
+"""
+    get_interpolation_val(p::Point, a::Point, b::Point)
 
+Get an interpolation value of point p between a line segment from a to b where a+t*(b-a) describes the point closes to p. 
+Return p which is between 0 and 1.
+"""
 function get_interpolation_val(p::Point, a::Point, b::Point)
     t_hat = dot(p-a, b-a)/norm(b-a)^2
 	t_star = clamp(t_hat, 0, 1)
     return t_star
 end
 
+"""
+    get_interpolation_point(a, b, t::Float64)
+
+Get the value of `a+t*(b-a)`
+"""
 get_interpolation_point(a, b, t::Float64) = a+t*(b-a)
 
+"""
+    point_linesegment_distance(p::Point, a::Point, b::Point)
+
+Get the smallest distance between point `p` and the line segment from `a` to `b`.
+"""
 function point_linesegment_distance(p::Point, a::Point, b::Point)
 	t = get_interpolation_val(p, a, b)
     p_on_ab = get_interpolation_point(a,b, t)
 	return norm(p_on_ab-p)
 end
 
+"""
+    get_candidate_on_way(city_map, p, way::Way, trans, rev_trans; rev=false)
+
+Get the best candidate of point `p` on the given `way`. 
+`trans` and `rev_trans` are transformations mapping from LLA to x,y and back.
+`rev` can be set to true to reverse the direction of `way`.
+"""
 function get_candidate_on_way(city_map, p, way::Way, trans, rev_trans; rev=false)
     lp = Point(getxy_from_lat_lon(p.lat, p.lon, trans)...)
     min_dist = Inf
@@ -53,6 +83,12 @@ function get_candidate_on_way(city_map, p, way::Way, trans, rev_trans; rev=false
     return best_candidate
 end
 
+"""
+    get_matching_candidates(city_map, way_ids, p, origin_lla; maximum_dist=100)
+
+Get matching candidates for a given point p and a list of possible way ids. 
+Only return candidates which have a maximum_dist (in m) to the way.
+"""
 function get_matching_candidates(city_map, way_ids, p, origin_lla; maximum_dist=100)
     trans = ENUfromLLA(origin_lla, wgs84)
     rev_trans = LLAfromENU(origin_lla, wgs84)
@@ -101,10 +137,14 @@ function get_way_kdtree(city_map)
     return id_to_way_id, kdtree, radius
 end
 
-function filter_candidates!(candidates)
+"""
+    filter_candidates!(candidates; closer_dist=25)  
+
+Filter out candidates which are further away than `closer_dist` if there is at least candidate which is closer than `closer_dist`.
+"""
+function filter_candidates!(candidates; closer_dist=25)
     isempty(candidates) && return candidates
-    closer_dist = 25
-    # if there are candidates which are closer than closer_dist0m drop all further away
+    # if there are candidates which are closer than closer_dist (in m) drop all further away
     min_dist = minimum(c.dist for c in candidates)
     if min_dist > closer_dist
         return candidates
@@ -153,6 +193,12 @@ function get_candidate_probability(candidate::Candidate; sigma=10)
     return 1/(sqrt(2π)*sigma)*exp((-candidate.dist^2)/(2*sigma^2))
 end
 
+"""
+    get_next_node_id(candidate::Candidate)
+
+Get the next node id given a candidate. This depends on `way_is_reverse` of the candidate.
+Can be used to create a `StreetSegment`.
+"""
 function get_next_node_id(candidate::Candidate)
     idx = prev_idx(candidate)+1
     nodes = candidate.way.nodes
@@ -162,6 +208,12 @@ function get_next_node_id(candidate::Candidate)
     return nodes[idx].id
 end
 
+"""
+    get_prev_node_id(candidate::Candidate)
+
+Get the previous node id given a candidate. This depends on `way_is_reverse` of the candidate.
+Can be used to create a `StreetSegment`.
+"""
 function get_prev_node_id(candidate::Candidate)
     idx = prev_idx(candidate)
     nodes = candidate.way.nodes
@@ -171,6 +223,11 @@ function get_prev_node_id(candidate::Candidate)
     return nodes[idx].id
 end
 
+"""
+    shortest_candidate_path(from::Candidate, to::Candidate, city_map)
+
+Return the shortest path as node ids from one candidate to another given a city map.
+"""
 function shortest_candidate_path(from::Candidate, to::Candidate, city_map)
     sp_from_id = get_next_node_id(from)
     sp_to_id = get_prev_node_id(to)
@@ -221,6 +278,11 @@ function transition_probability(from::Candidate, to::Candidate, city_map)
     return p
 end
 
+"""
+    filter_path(path, dist)
+
+Return a new path for which the minimum distance between two consecutive points is at least `dist`.
+"""
 function filter_path(path, dist)
     new_path = [path[1]]
     for i in 2:length(path)-1
@@ -234,6 +296,12 @@ function filter_path(path, dist)
     return new_path
 end
 
+"""
+    get_candidates_from_idx(vec_candidates, candidate_idxs)
+
+Return candidates from an nested vector of candiates like `[[c1,c2],[c3]]` and candiate_idxs which are 1d like `[1,3]` would return 
+`[c1, c3]`.
+"""
 function get_candidates_from_idx(vec_candidates, candidate_idxs)
     candidates = Vector{Candidate}()
     ncandidates = sum(length(cands) for cands in vec_candidates)
@@ -252,6 +320,17 @@ function get_candidates_from_idx(vec_candidates, candidate_idxs)
     return candidates
 end
 
+"""
+    map_path(city_map, path)
+
+Map a path of gps points to the best matching candidates for the path.
+1. Filter out points on the path which are closer together than 25m
+2. Compute candidates for each point in the remaining path
+3. Compute emission probabilties
+4. Compute transition_probabilities
+5. Use the Viterbi algorithm to compute the most likely path of the candidates
+Return the list of candidates.
+"""
 function map_path(city_map, path)
     path = filter_path(path, 25)
     vec_candidates = EverySingleStreet.get_candidates(city_map, path)
@@ -308,6 +387,11 @@ function map_path(city_map, path)
     return best_candidates
 end
 
+"""
+    calculate_streetpath(candidates, city_map)
+
+Generate a `StreetPath` from a list of candidates obtained by [`map_path`](@ref).
+"""
 function calculate_streetpath(candidates, city_map)
     segments = Vector{StreetSegment}()
     for ci in 2:length(candidates)
@@ -325,6 +409,13 @@ function calculate_streetpath(candidates, city_map)
     return StreetPath(segments)
 end
 
+
+"""
+    get_segments(city_map, current_candidate, next_candidate, sp)
+
+Given two candidates which can't be directly connected and a list of ids which form the shortest path between those candidates
+this function returns a list of `StreetSegment` which connect the two candidates.
+"""
 function get_segments(city_map, current_candidate, next_candidate, sp)
     origin_lla = get_centroid(city_map.nodes)
     trans = ENUfromLLA(origin_lla, wgs84)
