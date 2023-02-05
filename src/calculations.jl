@@ -565,10 +565,12 @@ function total_length(way::Way)
     return dist
 end
 
-function total_length(city_map::Map, exclude_type)
+function total_length(city_map::Map; filter_fct=(way)->true)
     dist = 0.0
     for way in city_map.ways
-        dist += total_length(way)
+        if filter_fct(way)
+            dist += total_length(way)
+        end
     end
     return dist
 end

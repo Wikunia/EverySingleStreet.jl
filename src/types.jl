@@ -10,6 +10,8 @@ struct Way
     nodes::Vector{Node}
     name::String
     highway::String
+    foot::String
+    access::String
 end
 
 struct Map

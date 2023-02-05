@@ -91,7 +91,9 @@ function draw_streetpaths(city_map, streetpaths, outpath; kwargs...)
             sethue("black")
             for way in city_map.ways
                 sethue("black")
-                draw_way(way, trans)
+                if iswalkable_road(way)
+                    draw_way(way, trans)
+                end
             end
         end
     ]

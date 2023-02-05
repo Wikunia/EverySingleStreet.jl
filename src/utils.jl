@@ -43,7 +43,7 @@ function parse_map(fpath)
             element[:tags][:oneway] = "no"
             way_nodes = [nodes[nodeid_to_local[node_id]] for node_id in element[:nodes]]
             wayid_to_local[element[:id]] = way_counter
-            ways[way_counter] = Way(element[:id], way_nodes, get(element[:tags],:name, ""), get(element[:tags],:highway, ""))
+            ways[way_counter] = Way(element[:id], way_nodes, get(element[:tags],:name, ""), get(element[:tags],:highway, ""), get(element[:tags],:foot, ""), get(element[:tags],:access, ""))
             way_counter += 1
         end
     end
@@ -212,4 +212,11 @@ function add_streetpaths!(filename, added_streetpaths::Vector{StreetPath})
     streetpaths = load(filename, "streetpaths")
     append!(streetpaths, added_streetpaths)
     save_streetpaths(filename, streetpaths)
+end
+
+function iswalkable_road(way::Way)
+    way.highway in ["", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential", "living_street", "pedestrian"] || return false
+    way.foot in ["no", "private", "discouraged"] && return false
+    way.access in ["no", "private", "customers"] && return false 
+    return true 
 end
