@@ -1,15 +1,19 @@
 module EverySingleStreet
 
 using Dates
-using LightOSM
-using JSON3
-using Luxor
+using Distributions
+using FileIO
 using Geodesy
+using HMMBase
+using JLD2
+using JSON3
+using LightOSM
+using LightXML: XMLDocument, save_file
+using Luxor
 using LinearAlgebra
 using NearestNeighbors
 using Statistics
 using TimeZones
-using LightXML: XMLDocument, save_file
 
 include("gpx.jl")
 include("types.jl")
