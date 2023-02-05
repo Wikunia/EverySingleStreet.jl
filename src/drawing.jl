@@ -90,11 +90,11 @@ end
 
 function draw_map(city_map, paths, outpath; streetpaths=Vector{StreetPath}(), scale_factor=0.1)
     origin_lla = get_centroid(city_map.nodes)
-    if !isempty(streetpaths)
-        origin_lla = streetpaths[1].segments[1].from.lla
+    if !isempty(paths)
+        origin_lla = LLA(paths[1][1].lat, paths[1][1].lon)
     end
     trans = ENUfromLLA(origin_lla, wgs84)
-    Drawing(1920, 1080, outpath)
+    Drawing(1920, 2520, outpath)
     origin()
     background("white")
     Luxor.scale(scale_factor,-scale_factor)
@@ -103,16 +103,14 @@ function draw_map(city_map, paths, outpath; streetpaths=Vector{StreetPath}(), sc
         sethue("black")
         draw_way(way, trans)
     end
-    #=
+    setopacity(1)
     sethue("blue")
     setline(3)
     for path in paths
-        draw_path(path, trans)
+        # draw_path(path, trans)
     end
-    =#
     sethue("green")
     setline(3)
-    setopacity(1)
     for streetpath in streetpaths
         draw_path(streetpath, trans)
     end
