@@ -2,8 +2,10 @@ module EverySingleStreet
 
 using Dates
 using Distributions
+using FileIO
 using Geodesy
 using HMMBase
+using JLD2
 using JSON3
 using LightOSM
 using LightXML: XMLDocument, save_file

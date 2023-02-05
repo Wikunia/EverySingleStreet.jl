@@ -66,6 +66,43 @@ function prev_idx(candidate)
     return pos
 end
 
+function draw_fcts(city_map, fcts, outpath; scale_factor=0.1, original_point=nothing)
+    origin_lla = get_centroid(city_map.nodes)
+    if !isnothing(original_point)
+        origin_lla = original_point
+    end
+    trans = ENUfromLLA(origin_lla, wgs84)
+    Drawing(1920, 1080, outpath)
+    origin()
+    background("white")
+    Luxor.scale(scale_factor,-scale_factor)
+    sethue("black")
+    for fct in fcts
+        @layer begin 
+            fct(trans)
+        end
+    end
+    finish()
+end
+
+function draw_streetpaths(city_map, streetpaths, outpath; kwargs...)
+    map_fcts = [
+       (trans)->begin
+            sethue("black")
+            for way in city_map.ways
+                sethue("black")
+                draw_way(way, trans)
+            end
+        end
+    ]
+    streetpath_fcts = [(trans)->begin 
+        sethue("green") 
+        setline(5)
+        draw_path(streetpath, trans) 
+    end for streetpath in streetpaths]
+    draw_fcts(city_map, [map_fcts..., streetpath_fcts...], outpath; kwargs...)
+end
+
 function draw_candidates(city_map, candidates, outpath; scale_factor=0.1, original_point=nothing)
     origin_lla = get_centroid(city_map.nodes)
     origin_lla = candidates[1].lla

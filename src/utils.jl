@@ -150,19 +150,23 @@ function get_first_way_segment(sp, city_map::Map)
     for (rev,func) in zip([false, true], [identity, reverse])
         for way in city_map.ways
             node_ids = func([n.id for n in way.nodes])
-            start_pos_idx = findfirst(==(sp[1]), node_ids)
-            pos_idx = start_pos_idx
-            spi = 1
-            if pos_idx !== nothing && pos_idx != length(node_ids)
-                while pos_idx+1 <= length(node_ids) && spi+1 <= length(sp) && node_ids[pos_idx+1] == sp[spi+1]
-                    len = spi+1
-                    pos_idx += 1
-                    spi += 1
-                    if len > best_len
-                        best_len = len
-                        best_way_segment = (way=way, rev=rev, from=start_pos_idx, to=pos_idx)
+            last_idx = 0
+            while last_idx !== nothing
+                start_pos_idx = findnext(==(sp[1]), node_ids, last_idx+1)
+                pos_idx = start_pos_idx
+                spi = 1
+                if pos_idx !== nothing && pos_idx != length(node_ids)
+                    while pos_idx+1 <= length(node_ids) && spi+1 <= length(sp) && node_ids[pos_idx+1] == sp[spi+1]
+                        len = spi+1
+                        pos_idx += 1
+                        spi += 1
+                        if len > best_len
+                            best_len = len
+                            best_way_segment = (way=way, rev=rev, from=start_pos_idx, to=pos_idx)
+                        end
                     end
                 end
+                last_idx = pos_idx
             end
         end
     end
@@ -176,4 +180,14 @@ function get_first_way_segment(sp, city_map::Map)
         return best_way_segment, new_sp
     end
     error("Couldn't find which contains at least the first two points of $sp directly after another")
+end
+
+function save_streetpaths(filename, streetpaths::Vector{StreetPath})
+    save(filename, Dict("streetpaths" => streetpaths))
+end
+
+function add_streetpaths!(filename, added_streetpaths::Vector{StreetPath})
+    streetpaaths = load(filename, "streetpaths")
+    append!(streetpaaths, added_streetpaths)
+    save_streetpaths(filename, streetpaaths)
 end

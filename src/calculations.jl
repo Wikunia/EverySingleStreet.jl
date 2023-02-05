@@ -320,6 +320,14 @@ function get_candidates_from_idx(vec_candidates, candidate_idxs)
     return candidates
 end
 
+function map_matching(city_map, path)
+    streetpaths = Vector{StreetPath}()
+    for candidates in map_path(city_map, path)
+        push!(streetpaths, calculate_streetpath(candidates, city_map))
+    end
+    return streetpaths
+end
+
 """
     map_path(city_map, path)
 
@@ -329,7 +337,7 @@ Map a path of gps points to the best matching candidates for the path.
 3. Compute emission probabilties
 4. Compute transition_probabilities
 5. Use the Viterbi algorithm to compute the most likely path of the candidates
-Return the list of candidates.
+Return a list of lists of candidates as a path might not continously have candidates. Then it's split up into several parts.
 """
 function map_path(city_map, path)
     path = filter_path(path, 25)
@@ -361,6 +369,7 @@ function map_path(city_map, path)
     end
     return candidates
 end
+
 
 function map_path(city_map, vec_candidates::Vector{Vector{Candidate}})
     ncandidates = sum(length(cands) for cands in vec_candidates)
@@ -404,9 +413,9 @@ function map_path(city_map, vec_candidates::Vector{Vector{Candidate}})
         transition_probabilities[i, i] = 1.0
     end
     println("Computed all probabilties")
-    hmm = HMM(transition_probabilities, emission_distributions)
+    @time hmm = HMM(transition_probabilities, emission_distributions)
     println("Created hmm")
-    best_candidates_idx = viterbi(hmm, 1:length(vec_candidates))
+    @time best_candidates_idx = viterbi(hmm, 1:length(vec_candidates))
     best_candidates = get_candidates_from_idx(vec_candidates, best_candidates_idx)
     return best_candidates
 end
