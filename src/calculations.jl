@@ -8,6 +8,11 @@ function getxy_from_lat_lon(lat, lon, trans)
     return x,y
 end
 
+function getxy(p::GPSPoint, trans)
+    x,y,z = trans(LLA(p.pos.lat, p.pos.lon))
+    return x,y
+end
+
 """
     get_lla(p, trans)
 
@@ -55,7 +60,7 @@ Get the best candidate of point `p` on the given `way`.
 `rev` can be set to true to reverse the direction of `way`.
 """
 function get_candidate_on_way(city_map, p, way::Way, trans, rev_trans; rev=false)
-    lp = Point(getxy_from_lat_lon(p.lat, p.lon, trans)...)
+    lp = Point(getxy(p, trans)...)
     min_dist = Inf
     best_candidate = nothing
     cλ = 0.0
@@ -168,7 +173,7 @@ function get_candidates(city_map, path)
     i = 0
     for p in path
         i += 1
-        kps[:,i] .= getxy_from_lat_lon(p.lat, p.lon, trans)
+        kps[:,i] .= getxy(p, trans)
     end
     idxs = inrange(way_tree, kps, radius)
     
@@ -269,7 +274,7 @@ end
 Return the transition_probability based on equation 10 in the  [fmm paper](https://www.tandfonline.com/doi/pdf/10.1080/13658816.2017.1400548?casa_token=RrxNeRXfRfkAAAAA:2IA6z4Pu-tKEcSaK44AUgQxDc-XUCBs8CSZI1qGNbUj6CpUMyA8suDUpnZ1WO3lHEUFuk1lk3s4wJtM)
 """
 function transition_probability(from::Candidate, to::Candidate, city_map)
-    d = euclidean_distance(from.measured_point, to.measured_point)
+    d = euclidean_distance(from.measured_point.pos, to.measured_point.pos)
     sp_dist = shortest_path_distance(from, to, city_map)
     p = min(d, sp_dist)/max(d, sp_dist)
     if isnan(p)
@@ -279,21 +284,21 @@ function transition_probability(from::Candidate, to::Candidate, city_map)
 end
 
 """
-    filter_path(path, dist)
+    filter_path(gps_points, dist)
 
 Return a new path for which the minimum distance between two consecutive points is at least `dist`.
 """
-function filter_path(path, dist)
-    new_path = [path[1]]
-    for i in 2:length(path)-1
-        if euclidean_distance(new_path[end], path[i]) > dist
-            push!(new_path, path[i])
+function filter_path(gps_points, dist)
+    new_gps_points = [gps_points[1]]
+    for i in 2:length(gps_points)-1
+        if euclidean_distance(new_gps_points[end].pos, gps_points[i].pos) > dist
+            push!(new_gps_points, gps_points[i])
         end
     end
-    push!(new_path, path[end])
-    saved_perc = 100*(1-(length(new_path)/length(path)))
+    push!(new_gps_points, gps_points[end])
+    saved_perc = 100*(1-(length(new_gps_points)/length(gps_points)))
     println("Saved $(saved_perc)%")
-    return new_path
+    return new_gps_points
 end
 
 """
@@ -320,16 +325,16 @@ function get_candidates_from_idx(vec_candidates, candidate_idxs)
     return candidates
 end
 
-function map_matching(city_map, path)
+function map_matching(city_map, gpxfile::GPXFile)
     streetpaths = Vector{StreetPath}()
-    for candidates in map_path(city_map, path)
-        push!(streetpaths, calculate_streetpath(candidates, city_map))
+    for (idx, candidates) in enumerate(map_path(city_map, gpxfile))
+        push!(streetpaths, calculate_streetpath(gpxfile.name, idx, candidates, city_map))
     end
     return streetpaths
 end
 
 """
-    map_path(city_map, path)
+    map_path(city_map, gpxfile)
 
 Map a path of gps points to the best matching candidates for the path.
 1. Filter out points on the path which are closer together than 25m
@@ -339,9 +344,9 @@ Map a path of gps points to the best matching candidates for the path.
 5. Use the Viterbi algorithm to compute the most likely path of the candidates
 Return a list of lists of candidates as a path might not continously have candidates. Then it's split up into several parts.
 """
-function map_path(city_map, path)
-    path = filter_path(path, 25)
-    vec_candidates = EverySingleStreet.get_candidates(city_map, path)
+function map_path(city_map, gpxfile::GPXFile)
+    gps_points = filter_path(gpxfile.gps_points, 25)
+    vec_candidates = EverySingleStreet.get_candidates(city_map, gps_points)
     idxs = Vector{Tuple{Int, Int}}()
     state = :new
     current_start_idx = 0
@@ -356,7 +361,7 @@ function map_path(city_map, path)
             if length(candidates) == 0
                 push!(idxs, (current_start_idx, idx-1))
                 current_start_idx = 0
-                state == :new
+                state = :new
             end
         end
     end
@@ -421,11 +426,11 @@ function map_path(city_map, vec_candidates::Vector{Vector{Candidate}})
 end
 
 """
-    calculate_streetpath(candidates, city_map)
+    calculate_streetpath(ame, subpath_id, candidates, city_map)
 
 Generate a `StreetPath` from a list of candidates obtained by [`map_path`](@ref).
 """
-function calculate_streetpath(candidates, city_map)
+function calculate_streetpath(name, subpath_id, candidates, city_map)
     segments = Vector{StreetSegment}()
     for ci in 2:length(candidates)
         current_candidate = candidates[ci-1]
@@ -439,7 +444,7 @@ function calculate_streetpath(candidates, city_map)
             append!(segments, partial_segments)
         end
     end
-    return StreetPath(segments)
+    return StreetPath(name, subpath_id, segments)
 end
 
 
@@ -458,13 +463,13 @@ function get_segments(city_map, current_candidate, next_candidate, sp)
     if length(sp) == 2 && sp[1] == sp[2]
         nodeid = get_next_node_id(current_candidate)
         node = get_node(city_map, nodeid)
-        lla = LLA(node.lat, node.lon)
-        c1 = get_candidate_on_way(city_map, lla, current_candidate.way, trans, rev_trans; rev=current_candidate.way_is_reverse)
+        gps_point = GPSPoint(LLA(node.lat, node.lon), current_candidate.measured_point.time)
+        c1 = get_candidate_on_way(city_map, gps_point, current_candidate.way, trans, rev_trans; rev=current_candidate.way_is_reverse)
         push!(segments, StreetSegment(current_candidate, c1))
         nodeid = get_prev_node_id(next_candidate)
         node = get_node(city_map, nodeid)
-        lla = LLA(node.lat, node.lon)
-        c2 = get_candidate_on_way(city_map, lla, next_candidate.way, trans, rev_trans; rev=current_candidate.way_is_reverse)
+        gps_point = GPSPoint(LLA(node.lat, node.lon), current_candidate.measured_point.time)
+        c2 = get_candidate_on_way(city_map, gps_point, next_candidate.way, trans, rev_trans; rev=current_candidate.way_is_reverse)
         push!(segments, StreetSegment(c2, next_candidate))
         return segments
     end
@@ -474,8 +479,8 @@ function get_segments(city_map, current_candidate, next_candidate, sp)
 
     nodeid = get_next_node_id(current_candidate)
     node = get_node(city_map, nodeid)
-    lla = LLA(node.lat, node.lon)
-    c1 = get_candidate_on_way(city_map, lla, current_candidate.way, trans, rev_trans; rev=current_candidate.way_is_reverse)
+    gps_point = GPSPoint(LLA(node.lat, node.lon), current_candidate.measured_point.time)
+    c1 = get_candidate_on_way(city_map, gps_point, current_candidate.way, trans, rev_trans; rev=current_candidate.way_is_reverse)
     push!(segments, StreetSegment(current_candidate, c1))
 
     for way_segment in way_segments
@@ -484,19 +489,19 @@ function get_segments(city_map, current_candidate, next_candidate, sp)
             nodes = reverse(nodes)
         end
         node = nodes[way_segment.from]
-        lla = LLA(node.lat, node.lon)
-        c1 = get_candidate_on_way(city_map, lla, way_segment.way, trans, rev_trans; rev=way_segment.rev)
+        gps_point = GPSPoint(LLA(node.lat, node.lon), current_candidate.measured_point.time)
+        c1 = get_candidate_on_way(city_map, gps_point, way_segment.way, trans, rev_trans; rev=way_segment.rev)
 
         node = nodes[way_segment.to]
-        lla = LLA(node.lat, node.lon)
-        c2 = get_candidate_on_way(city_map, lla, way_segment.way, trans, rev_trans; rev=way_segment.rev)
+        gps_point =GPSPoint(LLA(node.lat, node.lon), current_candidate.measured_point.time)
+        c2 = get_candidate_on_way(city_map, gps_point, way_segment.way, trans, rev_trans; rev=way_segment.rev)
         push!(segments, StreetSegment(c1, c2))
     end
 
     nodeid = get_prev_node_id(next_candidate)
     node = get_node(city_map, nodeid)
-    lla = LLA(node.lat, node.lon)
-    c2 = get_candidate_on_way(city_map, lla, next_candidate.way, trans, rev_trans; rev=next_candidate.way_is_reverse)
+    gps_point = GPSPoint(LLA(node.lat, node.lon), current_candidate.measured_point.time)
+    c2 = get_candidate_on_way(city_map, gps_point, next_candidate.way, trans, rev_trans; rev=next_candidate.way_is_reverse)
     push!(segments, StreetSegment(c2, next_candidate))
     return segments
 end
@@ -531,6 +536,18 @@ function segments(way::Way)
     return [(LLA(node1.lat, node1.lon), LLA(node2.lat, node2.lon)) for (node1,node2) in zip(way.nodes[1:end-1], way.nodes[2:end])]
 end
 
+function total_length(streetpath::StreetPath)
+    dist = 0.0
+    for segment in streetpath.segments
+        dist += euclidean_distance(segment.from.measured_point.pos, segment.to.measured_point.pos)
+    end
+    return dist
+end
+
+function total_length(streetpaths::Vector{StreetPath})
+    return sum(total_length(p) for p in streetpaths)
+end
+
 function total_length(city_map::Map, node_ids::Vector{Int})
     nodes = [city_map.nodes[city_map.osm_id_to_node_id[osm_id]] for osm_id in node_ids]
     dist = 0.0
@@ -548,7 +565,7 @@ function total_length(way::Way)
     return dist
 end
 
-function total_length(city_map::Map)
+function total_length(city_map::Map, exclude_type)
     dist = 0.0
     for way in city_map.ways
         dist += total_length(way)

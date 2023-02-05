@@ -20,13 +20,22 @@ struct Map
     ways::Vector{Way}
 end
 
+struct GPSPoint 
+    pos::LLA
+    time::ZonedDateTime
+end
 struct Candidate
-    measured_point::LLA
+    measured_point::GPSPoint
     lla::LLA
     way::Way
     way_is_reverse::Bool
     dist::Float64
     λ::Float64
+end
+
+struct GPXFile
+    name::String 
+    gps_points::Vector{GPSPoint}
 end
 
 """
@@ -39,7 +48,10 @@ struct StreetSegment
     from::Candidate
     to::Candidate
 end
+
 struct StreetPath
+    name::String
+    subpath_id::Int
     segments::Vector{StreetSegment}
 end
 

@@ -11,7 +11,10 @@
         LLA(51.8043692602778, 10.335160446571944),
         LLA(51.80400106293405, 10.335266393838086)
     ]
-    candidates = EverySingleStreet.map_path(city_map, path)
+    times = [now()+i*Second(30) for i in 1:length(path)]
+    points = [EverySingleStreet.GPSPoint(p, ZonedDateTime(time, TimeZone("UTC"))) for (p, time) in zip(path, times)]
+    gpxfile = EverySingleStreet.GPXFile("test", points)
+    candidates = EverySingleStreet.map_path(city_map, gpxfile)
     @test length(candidates) == 1
     street_names = [c.way.name for c in candidates[1]]
     @test street_names == ["Windmühlenstraße","Adolph-Roemer-Straße","Adolph-Roemer-Straße","Adolph-Roemer-Straße","Graupenstraße","Graupenstraße","Graupenstraße","Schulstraße"]
@@ -29,8 +32,12 @@ end
         LLA(51.8043692602778, 10.335160446571944),
         LLA(51.80400106293405, 10.335266393838086)
     ]
-    candidates = EverySingleStreet.map_path(city_map, path)
-    streetpath = EverySingleStreet.calculate_streetpath(candidates[1], city_map)
+    times = [now()+i*Second(30) for i in 1:length(path)]
+    points = [EverySingleStreet.GPSPoint(p, ZonedDateTime(time, TimeZone("UTC"))) for (p, time) in zip(path, times)]
+    gpxfile = EverySingleStreet.GPXFile("test", points)
+
+    candidates = EverySingleStreet.map_path(city_map, gpxfile)
+    streetpath = EverySingleStreet.calculate_streetpath("test", 1, candidates[1], city_map)
     # check the segment properties
     for segment in streetpath.segments
         from = segment.from 

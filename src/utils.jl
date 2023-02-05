@@ -57,7 +57,9 @@ function parse_gpx(fpath)
     @assert length(gpxFile.tracks) == 1
     @assert length(gpxFile.tracks[1].segments) == 1
 
-    return [LLA(p.lat, p.lon, p.ele) for p in gpxFile.tracks[1].segments[1].points]
+    points = [GPSPoint(LLA(p.lat, p.lon, p.ele), p.time) for p in gpxFile.tracks[1].segments[1].points]
+    filename = splitext(basename(fpath))[1]
+    return GPXFile(filename, points)
 end
 
 
@@ -186,8 +188,28 @@ function save_streetpaths(filename, streetpaths::Vector{StreetPath})
     save(filename, Dict("streetpaths" => streetpaths))
 end
 
+function update_streetpaths!(filename, update_streetpaths::Vector{StreetPath})
+    streetpaths = load(filename, "streetpaths")
+    for streetpath in update_streetpaths
+        replaced = false
+        for (idx,saved_streetpath) in enumerate(streetpaths)
+            if streetpath.name == saved_streetpath.name && streetpath.subpath_id == saved_streetpath.subpath_id
+                streetpaths[idx] = streetpath
+                println("Replaced streetpaths with name $(streetpath.name)")
+                replaced = true
+                break
+            end
+        end
+        replaced && continue
+        println("Added streetpaths with name $(streetpath.name)")
+        push!(streetpaths, streetpath)
+    end
+    save_streetpaths(filename, streetpaths)
+end
+
+
 function add_streetpaths!(filename, added_streetpaths::Vector{StreetPath})
-    streetpaaths = load(filename, "streetpaths")
-    append!(streetpaaths, added_streetpaths)
-    save_streetpaths(filename, streetpaaths)
+    streetpaths = load(filename, "streetpaths")
+    append!(streetpaths, added_streetpaths)
+    save_streetpaths(filename, streetpaths)
 end
