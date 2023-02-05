@@ -12,7 +12,8 @@
         LLA(51.80400106293405, 10.335266393838086)
     ]
     candidates = EverySingleStreet.map_path(city_map, path)
-    street_names = [c.way.name for c in candidates]
+    @test length(candidates) == 1
+    street_names = [c.way.name for c in candidates[1]]
     @test street_names == ["Windmühlenstraße","Adolph-Roemer-Straße","Adolph-Roemer-Straße","Adolph-Roemer-Straße","Graupenstraße","Graupenstraße","Graupenstraße","Schulstraße"]
 end
 
@@ -29,7 +30,7 @@ end
         LLA(51.80400106293405, 10.335266393838086)
     ]
     candidates = EverySingleStreet.map_path(city_map, path)
-    streetpath = EverySingleStreet.calculate_streetpath(candidates, city_map)
+    streetpath = EverySingleStreet.calculate_streetpath(candidates[1], city_map)
     # check the segment properties
     for segment in streetpath.segments
         from = segment.from 

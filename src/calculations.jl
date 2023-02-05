@@ -334,11 +334,35 @@ Return the list of candidates.
 function map_path(city_map, path)
     path = filter_path(path, 25)
     vec_candidates = EverySingleStreet.get_candidates(city_map, path)
-    val, idx = findmin(length.(vec_candidates))
-    if val == 0
-        # Todo also do the rest later
-        vec_candidates = vec_candidates[1:idx-1]
+    idxs = Vector{Tuple{Int, Int}}()
+    state = :new
+    current_start_idx = 0
+    for (idx,candidates) in enumerate(vec_candidates)
+        if state == :new
+            if length(candidates) > 0 
+                current_start_idx = idx
+                state = :ongoing
+            end
+        end
+        if state == :ongoing 
+            if length(candidates) == 0
+                push!(idxs, (current_start_idx, idx-1))
+                current_start_idx = 0
+                state == :new
+            end
+        end
     end
+    if state == :ongoing
+        push!(idxs, (current_start_idx, length(vec_candidates)))
+    end
+    candidates = Vector{Vector{Candidate}}()
+    for tpl in idxs 
+        push!(candidates, map_path(city_map, vec_candidates[tpl[1]:tpl[2]]))
+    end
+    return candidates
+end
+
+function map_path(city_map, vec_candidates::Vector{Vector{Candidate}})
     ncandidates = sum(length(cands) for cands in vec_candidates)
     @show length(vec_candidates)
     println("Average number of candidates: $(ncandidates / length(vec_candidates))")

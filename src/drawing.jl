@@ -66,7 +66,7 @@ function prev_idx(candidate)
     return pos
 end
 
-function draw_candidates(city_map, candidates, outpath, scale_factor=0.1)
+function draw_candidates(city_map, candidates, outpath; scale_factor=0.1, original_point=nothing)
     origin_lla = get_centroid(city_map.nodes)
     origin_lla = candidates[1].lla
     trans = ENUfromLLA(origin_lla, wgs84)
@@ -85,16 +85,21 @@ function draw_candidates(city_map, candidates, outpath, scale_factor=0.1)
         circle(p, 10, :fill)
         # draw_way(c.way, trans)
     end
+    sethue("blue")
+    if original_point !== nothing 
+        p = Point(getxy_from_lat_lon(original_point.lat, original_point.lon, trans))
+        circle(p, 3, :fill)
+    end
     finish()
 end
 
 function draw_map(city_map, paths, outpath; streetpaths=Vector{StreetPath}(), scale_factor=0.1)
     origin_lla = get_centroid(city_map.nodes)
     if !isempty(paths)
-        origin_lla = LLA(paths[1][1].lat, paths[1][1].lon)
+        origin_lla = LLA(paths[1][ceil(Int, end/2)].lat, paths[1][ceil(Int, end/2)].lon)
     end
     trans = ENUfromLLA(origin_lla, wgs84)
-    Drawing(1920, 2520, outpath)
+    Drawing(1920, 1080, outpath)
     origin()
     background("white")
     Luxor.scale(scale_factor,-scale_factor)
