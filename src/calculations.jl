@@ -436,8 +436,12 @@ function calculate_streetpath(name, subpath_id, candidates, city_map)
         current_candidate = candidates[ci-1]
         next_candidate = candidates[ci]
         if current_candidate.way.id == next_candidate.way.id
-            @assert current_candidate.way_is_reverse == next_candidate.way_is_reverse
-            push!(segments, StreetSegment(current_candidate, next_candidate))
+            if current_candidate.way_is_reverse == next_candidate.way_is_reverse
+                push!(segments, StreetSegment(current_candidate, next_candidate))
+            else
+                next_candidate = get_reverse_candidate(next_candidate)
+                push!(segments, StreetSegment(current_candidate, next_candidate))
+            end 
         else
             sp = shortest_candidate_path(current_candidate, next_candidate, city_map)
             partial_segments = get_segments(city_map, current_candidate, next_candidate, sp)
@@ -583,4 +587,98 @@ function total_length(paths::Vector{Vector{LLA{T}}}) where T
         end
     end
     return dist
+end
+
+function total_length(parts::WalkedParts; filter_fct=(way)->true)
+    dist = 0.0
+    for (k,way) in parts.ways
+        if filter_fct(way.way)
+            dist += sum(p[2]-p[1] for p in way.parts)
+        end
+    end
+    return dist
+end
+
+
+
+function calculate_walked_parts(streetpaths::Vector{StreetPath}, city_map::Map)
+    names = Dict{String, Vector{Int}}()
+    ways = Dict{Int, WalkedWay}()
+    for way in city_map.ways
+        if haskey(names, way.name)
+            push!(names[way.name], way.id)
+        else 
+            names[way.name] = [way.id]
+        end
+    end
+
+    for streetpath in streetpaths
+        for segment in streetpath.segments 
+            len_way = total_length(segment.from.way)
+            start_λ = 0.0
+            finish_λ = 0.0
+            if segment.from.way_is_reverse
+                start_λ = len_way-segment.from.λ
+                finish_λ = len_way-segment.to.λ
+            else 
+                start_λ = segment.from.λ
+                finish_λ = segment.to.λ
+            end
+            start_λ, finish_λ = extrema((start_λ, finish_λ))
+            if start_λ == finish_λ 
+                continue
+            end
+            if !haskey(ways, segment.from.way.id)
+                ways[segment.from.way.id] = WalkedWay(segment.from.way, [(start_λ, finish_λ)])
+            else 
+                ranges = ways[segment.from.way.id].parts
+                push!(ranges, (start_λ, finish_λ))
+                ways = @set ways[segment.from.way.id].parts = merge_ranges(ranges)
+            end
+        end
+    end
+
+    return WalkedParts(names, ways)
+end
+
+function merge_ranges(ranges::Vector{Tuple{T, T}}) where T
+    # sort the ranges by their start value
+    sorted_ranges = sort(ranges, by = x -> x[1])
+
+    # initialize the result with the first range
+    result = [sorted_ranges[1]]
+
+    # iterate over the rest of the ranges
+    for i in 2:length(sorted_ranges)
+        # if the current range overlaps with the previous range, merge them
+        if sorted_ranges[i][1] <= result[end][2]
+            result = @set result[end][2] = max(result[end][2], sorted_ranges[i][2])
+        else
+            # if there is no overlap, add the current range to the result
+            push!(result, sorted_ranges[i])
+        end
+    end
+
+    return result
+end
+
+function get_walked_street(walked_parts::WalkedParts, city_map::Map, name)
+    way_ids = walked_parts.names[name]
+    complete_dist = 0.0
+    walked_dist = 0.0
+    for way_id in way_ids
+        local_way_id = city_map.osm_id_to_edge_id[way_id]
+        way = city_map.ways[local_way_id]
+        complete_dist += total_length(way)
+        if haskey(walked_parts.ways, way_id)
+            walked_way = walked_parts.ways[way_id]
+            walked_dist += sum(p[2]-p[1] for p in walked_way.parts)
+            @show  walked_way.parts
+            @show total_length(walked_way.way)
+        else 
+            @show way_id
+        end
+    end
+    @show walked_dist
+    @show complete_dist
 end

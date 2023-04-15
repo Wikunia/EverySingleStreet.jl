@@ -72,7 +72,7 @@ function draw_fcts(city_map, fcts, outpath; scale_factor=0.1, original_point=not
         origin_lla = original_point
     end
     trans = ENUfromLLA(origin_lla, wgs84)
-    Drawing(2000, 2500, outpath)
+    Drawing(1920, 1080, outpath)
     origin()
     background("white")
     Luxor.scale(scale_factor,-scale_factor)

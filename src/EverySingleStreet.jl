@@ -1,5 +1,6 @@
 module EverySingleStreet
 
+using Accessors
 using Dates
 using Distributions
 using FileIO

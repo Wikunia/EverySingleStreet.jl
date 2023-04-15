@@ -67,7 +67,7 @@ function combine_gpx_tracks(folder)
     author = GPX.GPXAuthor("EverySingleStreet.jl")
 
     metadata = GPX.GPXMetadata(
-        name="07/11/2019 LFBI (09:32) LFBI (11:34)",
+        name="EverySingleStreet",
         author=author,
         time=now(localzone())
     )
@@ -215,8 +215,13 @@ function add_streetpaths!(filename, added_streetpaths::Vector{StreetPath})
 end
 
 function iswalkable_road(way::Way)
-    way.highway in ["", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential", "living_street", "pedestrian"] || return false
+    way.highway in ["", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential", "living_street", "pedestrian", "secondary_link"] || return false
     way.foot in ["no", "private", "discouraged"] && return false
     way.access in ["no", "private", "customers"] && return false 
     return true 
+end
+
+function iswalkable(way::Way)
+    iswalkable_road(way) && return true
+    return way.highway in ["footway", "track", "steps", "path", "service"]
 end
