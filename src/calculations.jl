@@ -653,7 +653,7 @@ function calculate_walked_parts(streetpaths::Vector{StreetPath}, city_map::Map)
                 push!(ranges, (start_λ, finish_λ))
                 ways = @set ways[segment.from.way.id].parts = merge_ranges(ranges)
             end
-            if segment.from.way.id == 27272056
+            if segment.from.way.id == 35084223
                 @show (start_λ, finish_λ)
                 @show ways[segment.from.way.id].parts
             end
@@ -714,7 +714,7 @@ function get_candidate_on_way(way::Way, dist)
     if dist >= cum_dists[end]
         lla = LLA(nodes[end].lat, nodes[end].lon)
         gpspoint = GPSPoint(lla, ZonedDateTime(now(), TimeZone("UTC")))
-        candidate = Candidate(gpspoint, lla, way, false, dist, 1.0)
+        candidate = Candidate(gpspoint, lla, way, false, dist, cum_dists[end])
         return candidate
     end
     to_idx = from_idx+1
@@ -734,7 +734,7 @@ function get_segments(walked_way::WalkedWay)
         
         from_candidate = get_candidate_on_way(walked_way.way, part[1])
         to_candidate = get_candidate_on_way(walked_way.way, part[2])
-        if walked_way.way.id == 27272056
+        if walked_way.way.id == 35084223
             @show from_candidate.way_is_reverse
             @show from_candidate.λ
             @show to_candidate.way_is_reverse
