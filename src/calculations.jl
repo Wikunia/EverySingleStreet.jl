@@ -67,7 +67,7 @@ function get_candidate_on_way(node::Node, way::Way; rev=false)
         end
         last_node = n
     end
-    return Candidate(gpspoint, lla, way, false, 0, λ) 
+    return Candidate(gpspoint, lla, way, rev, 0, λ) 
 end
 
 """
@@ -652,6 +652,10 @@ function calculate_walked_parts(streetpaths::Vector{StreetPath}, city_map::Map)
                 ranges = ways[segment.from.way.id].parts
                 push!(ranges, (start_λ, finish_λ))
                 ways = @set ways[segment.from.way.id].parts = merge_ranges(ranges)
+            end
+            if segment.from.way.id == 27272056
+                @show (start_λ, finish_λ)
+                @show ways[segment.from.way.id].parts
             end
         end
     end
