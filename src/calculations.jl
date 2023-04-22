@@ -52,6 +52,24 @@ function point_linesegment_distance(p::Point, a::Point, b::Point)
 	return norm(p_on_ab-p)
 end
 
+function get_candidate_on_way(node::Node, way::Way; rev=false)
+    nodes = rev ? reverse(way.nodes) : way.nodes
+    node_ids = [n.id for n in nodes]
+    @assert node.id in node_ids
+    lla = LLA(node.lat, node.lon)
+    gpspoint = GPSPoint(lla, ZonedDateTime(now(), TimeZone("UTC")))
+    λ = 0.0
+    last_node = nodes[1]
+    for n in nodes 
+        λ += euclidean_distance(LLA(last_node.lat, last_node.lon), LLA(n.lat, n.lon))
+        if n.id == node.id
+            break
+        end
+        last_node = n
+    end
+    return Candidate(gpspoint, lla, way, false, 0, λ) 
+end
+
 """
     get_candidate_on_way(city_map, p, way::Way, trans, rev_trans; rev=false)
 
@@ -195,7 +213,8 @@ end
 Return the emission probability of the given candidate and the standard deviation of the gps error.
 """
 function get_candidate_probability(candidate::Candidate; sigma=10)
-    return 1/(sqrt(2π)*sigma)*exp((-candidate.dist^2)/(2*sigma^2))
+    dist = candidate.dist
+    return 1/(sqrt(2π)*sigma)*exp((-dist^2)/(2*sigma^2))
 end
 
 """
@@ -477,10 +496,9 @@ function get_segments(city_map, current_candidate, next_candidate, sp)
         push!(segments, StreetSegment(c2, next_candidate))
         return segments
     end
-    
+
 
     way_segments = get_way_segments(sp, city_map)
-
     nodeid = get_next_node_id(current_candidate)
     node = get_node(city_map, nodeid)
     gps_point = GPSPoint(LLA(node.lat, node.lon), current_candidate.measured_point.time)
@@ -493,12 +511,10 @@ function get_segments(city_map, current_candidate, next_candidate, sp)
             nodes = reverse(nodes)
         end
         node = nodes[way_segment.from]
-        gps_point = GPSPoint(LLA(node.lat, node.lon), current_candidate.measured_point.time)
-        c1 = get_candidate_on_way(city_map, gps_point, way_segment.way, trans, rev_trans; rev=way_segment.rev)
+        c1 = get_candidate_on_way(node, way_segment.way; rev=way_segment.rev)
 
         node = nodes[way_segment.to]
-        gps_point =GPSPoint(LLA(node.lat, node.lon), current_candidate.measured_point.time)
-        c2 = get_candidate_on_way(city_map, gps_point, way_segment.way, trans, rev_trans; rev=way_segment.rev)
+        c2 =  get_candidate_on_way(node, way_segment.way; rev=way_segment.rev)
         push!(segments, StreetSegment(c1, c2))
     end
 
@@ -628,6 +644,8 @@ function calculate_walked_parts(streetpaths::Vector{StreetPath}, city_map::Map)
             if start_λ == finish_λ 
                 continue
             end
+            start_λ = clamp(start_λ-5, 0, len_way)
+            finish_λ = clamp(finish_λ+5, 0, len_way)
             if !haskey(ways, segment.from.way.id)
                 ways[segment.from.way.id] = WalkedWay(segment.from.way, [(start_λ, finish_λ)])
             else 
@@ -681,4 +699,136 @@ function get_walked_street(walked_parts::WalkedParts, city_map::Map, name)
     end
     @show walked_dist
     @show complete_dist
+end
+
+function get_candidate_on_way(way::Way, dist)
+    nodes = way.nodes
+    dists = [euclidean_distance(LLA(n1.lat, n1.lon), LLA(n2.lat, n2.lon)) for (n1,n2) in zip(nodes[1:end-1], nodes[2:end])]
+    cum_dists = cumsum(dists)
+    prepend!(cum_dists, 0)
+    from_idx = findlast(<=(dist), cum_dists)
+    if dist >= cum_dists[end]
+        lla = LLA(nodes[end].lat, nodes[end].lon)
+        gpspoint = GPSPoint(lla, ZonedDateTime(now(), TimeZone("UTC")))
+        candidate = Candidate(gpspoint, lla, way, false, dist, 1.0)
+        return candidate
+    end
+    to_idx = from_idx+1
+    from_node = nodes[from_idx]
+    to_node = nodes[to_idx]
+    
+    t = 1-(cum_dists[to_idx]-dist)/ (cum_dists[to_idx]-cum_dists[from_idx])
+    lla = LLA(get_interpolation_point(Point(from_node.lat, from_node.lon), Point(to_node.lat, to_node.lon), t)...)
+    gpspoint = GPSPoint(lla, ZonedDateTime(now(), TimeZone("UTC")))
+    candidate = Candidate(gpspoint, lla, way, false, 0.0, dist)
+    return candidate
+end
+
+function get_segments(walked_way::WalkedWay)
+    segments = Vector{StreetSegment}()
+    for part in walked_way.parts
+        
+        from_candidate = get_candidate_on_way(walked_way.way, part[1])
+        to_candidate = get_candidate_on_way(walked_way.way, part[2])
+        if walked_way.way.id == 27272056
+            @show from_candidate.way_is_reverse
+            @show from_candidate.λ
+            @show to_candidate.way_is_reverse
+            @show to_candidate.λ
+        end
+        push!(segments, StreetSegment(from_candidate, to_candidate))
+    end
+    return segments
+end
+
+function get_gps_points(segment)
+    prev_from_idx = prev_idx(segment.from)+1
+    prev_to_idx = prev_idx(segment.to)
+    points = Vector{GPSPoint}()
+    if segment.from == segment.to 
+        return points
+    end
+    if prev_from_idx > prev_to_idx
+        push!(points, GPSPoint(segment.from.lla , ZonedDateTime(now(), TimeZone("UTC"))))
+        push!(points, GPSPoint(segment.to.lla , ZonedDateTime(now(), TimeZone("UTC"))))
+        return points
+    end
+    points = [GPSPoint(segment.from.lla , ZonedDateTime(now(), TimeZone("UTC")))]
+    nodes = segment.from.way.nodes
+    if segment.from.way_is_reverse
+        nodes = reverse(nodes)
+    end
+
+    for i in prev_from_idx:prev_to_idx
+        node = nodes[i]
+        push!(points, GPSPoint(LLA(node.lat, node.lon),  ZonedDateTime(now(), TimeZone("UTC"))))
+    end
+    push!(points, GPSPoint(segment.to.lla , ZonedDateTime(now(), TimeZone("UTC"))))
+    return points
+end
+
+function streetpaths_to_gpx(streetpaths::Vector{StreetPath}, gps_filename)
+    author = GPX.GPXAuthor("EverySingleStreet.jl")
+
+    metadata = GPX.GPXMetadata(
+        name="EverySingleStreet",
+        author=author,
+        time=now(localzone())
+    )
+
+    gpx = GPX.GPXDocument(metadata)
+
+    track = GPX.new_track(gpx)
+
+    for streetpath in streetpaths
+        segments = streetpath.segments
+        for segment in segments
+            track_segment = GPX.new_track_segment(track)
+
+            gps_points = get_gps_points(segment)
+            for p in gps_points
+                point = GPX.GPXPoint(p.pos.lat, p.pos.lon, 0, p.time, "")
+                push!(track_segment, point)
+            end
+        end
+    end
+
+    xdoc = XMLDocument(gpx)
+
+
+    save_file(xdoc, gps_filename)
+    println("GPX file saved to \"$gps_filename\"")
+end
+
+function walked_parts_to_gpx(walked_parts::WalkedParts, gps_filename)
+    author = GPX.GPXAuthor("EverySingleStreet.jl")
+
+    metadata = GPX.GPXMetadata(
+        name="EverySingleStreet",
+        author=author,
+        time=now(localzone())
+    )
+
+    gpx = GPX.GPXDocument(metadata)
+
+    track = GPX.new_track(gpx)
+
+    for (way_id, way) in walked_parts.ways
+        segments = get_segments(way)
+        for segment in segments
+            track_segment = GPX.new_track_segment(track)
+
+            gps_points = get_gps_points(segment)
+            for p in gps_points
+                point = GPX.GPXPoint(p.pos.lat, p.pos.lon, 0, p.time, "")
+                push!(track_segment, point)
+            end
+        end
+    end
+
+    xdoc = XMLDocument(gpx)
+
+
+    save_file(xdoc, gps_filename)
+    println("GPX file saved to \"$gps_filename\"")
 end

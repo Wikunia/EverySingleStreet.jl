@@ -107,7 +107,7 @@ end
 
 function draw_candidates(city_map, candidates, outpath; scale_factor=0.1, original_point=nothing)
     origin_lla = get_centroid(city_map.nodes)
-    origin_lla = candidates[1].lla
+    origin_lla = candidates[div(end,2)].lla
     trans = ENUfromLLA(origin_lla, wgs84)
     Drawing(1920, 1080, outpath)
     origin()
@@ -119,10 +119,10 @@ function draw_candidates(city_map, candidates, outpath; scale_factor=0.1, origin
         draw_way(way, trans)
     end
     sethue("green")
+    @show length(candidates)
     for c in candidates
         p = Point(getxy_from_lat_lon(c.lla.lat, c.lla.lon, trans))
         circle(p, 10, :fill)
-        # draw_way(c.way, trans)
     end
     sethue("blue")
     if original_point !== nothing 
