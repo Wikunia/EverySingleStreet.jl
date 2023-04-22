@@ -653,10 +653,6 @@ function calculate_walked_parts(streetpaths::Vector{StreetPath}, city_map::Map)
                 push!(ranges, (start_λ, finish_λ))
                 ways = @set ways[segment.from.way.id].parts = merge_ranges(ranges)
             end
-            if segment.from.way.id == 35084223
-                @show (start_λ, finish_λ)
-                @show ways[segment.from.way.id].parts
-            end
         end
     end
 
@@ -734,12 +730,6 @@ function get_segments(walked_way::WalkedWay)
         
         from_candidate = get_candidate_on_way(walked_way.way, part[1])
         to_candidate = get_candidate_on_way(walked_way.way, part[2])
-        if walked_way.way.id == 35084223
-            @show from_candidate.way_is_reverse
-            @show from_candidate.λ
-            @show to_candidate.way_is_reverse
-            @show to_candidate.λ
-        end
         push!(segments, StreetSegment(from_candidate, to_candidate))
     end
     return segments
