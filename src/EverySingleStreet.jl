@@ -15,6 +15,7 @@ using LinearAlgebra
 using NearestNeighbors
 using Statistics
 using TimeZones
+using Unitful
 
 include("gpx.jl")
 include("types.jl")

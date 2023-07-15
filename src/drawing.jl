@@ -105,6 +105,24 @@ function draw_streetpaths(city_map, streetpaths, outpath; kwargs...)
     draw_fcts(city_map, [map_fcts..., streetpath_fcts...], outpath; kwargs...)
 end
 
+function create_images(city_map, streetpaths, folder; kwargs...)
+    is = Vector{Int}()
+    for i in 1:length(streetpaths)-1
+        if streetpaths[i].name == streetpaths[i+1].name 
+            continue
+        end
+        push!(is, i)
+    end
+    @show length(is)
+    c = 0
+    for i in is
+        str_c = lpad(c, 5, "0")
+        fname = joinpath(folder, "$str_c.png")
+        draw_streetpaths(city_map, streetpaths[1:i], fname; kwargs...)
+        c += 1
+    end
+end
+
 function draw_candidates(city_map, candidates, outpath; scale_factor=0.1, original_point=nothing)
     origin_lla = get_centroid(city_map.nodes)
     origin_lla = candidates[div(end,2)].lla

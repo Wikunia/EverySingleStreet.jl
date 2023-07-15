@@ -25,7 +25,7 @@ end
 """
     get_interpolation_val(p::Point, a::Point, b::Point)
 
-Get an interpolation value of point p between a line segment from a to b where a+t*(b-a) describes the point closes to p. 
+Get an interpolation value of point p between a line segment from a to b where a+t*(b-a) describes the point closes to p.
 Return p which is between 0 and 1.
 """
 function get_interpolation_val(p::Point, a::Point, b::Point)
@@ -60,20 +60,20 @@ function get_candidate_on_way(node::Node, way::Way; rev=false)
     gpspoint = GPSPoint(lla, ZonedDateTime(now(), TimeZone("UTC")))
     λ = 0.0
     last_node = nodes[1]
-    for n in nodes 
+    for n in nodes
         λ += euclidean_distance(LLA(last_node.lat, last_node.lon), LLA(n.lat, n.lon))
         if n.id == node.id
             break
         end
         last_node = n
     end
-    return Candidate(gpspoint, lla, way, rev, 0, λ) 
+    return Candidate(gpspoint, lla, way, rev, 0, λ)
 end
 
 """
     get_candidate_on_way(city_map, p, way::Way, trans, rev_trans; rev=false)
 
-Get the best candidate of point `p` on the given `way`. 
+Get the best candidate of point `p` on the given `way`.
 `trans` and `rev_trans` are transformations mapping from LLA to x,y and back.
 `rev` can be set to true to reverse the direction of `way`.
 """
@@ -94,7 +94,7 @@ function get_candidate_on_way(city_map, p, way::Way, trans, rev_trans; rev=false
         w2p = Point(getxy_from_lat_lon(w2.lat, w2.lon, trans))
         dist = point_linesegment_distance(lp, w1p, w2p)
         if dist < min_dist
-            min_dist = dist 
+            min_dist = dist
             t = get_interpolation_val(lp, w1p, w2p)
             p_on_ab = get_lla(get_interpolation_point(w1p, w2p, t), rev_trans)
             λ = cλ+euclidean_distance(LLA(w1.lat, w1.lon), p_on_ab)
@@ -107,12 +107,12 @@ function get_candidate_on_way(city_map, p, way::Way, trans, rev_trans; rev=false
 end
 
 """
-    get_matching_candidates(city_map, way_ids, p, origin_lla; maximum_dist=100)
+    get_matching_candidates(city_map, way_ids, p, origin_lla; maximum_dist=30)
 
-Get matching candidates for a given point p and a list of possible way ids. 
+Get matching candidates for a given point p and a list of possible way ids.
 Only return candidates which have a maximum_dist (in m) to the way.
 """
-function get_matching_candidates(city_map, way_ids, p, origin_lla; maximum_dist=100)
+function get_matching_candidates(city_map, way_ids, p, origin_lla; maximum_dist=30)
     trans = ENUfromLLA(origin_lla, wgs84)
     rev_trans = LLAfromENU(origin_lla, wgs84)
 
@@ -132,7 +132,7 @@ end
     get_way_kdtree(city_map)
 
 Create a KDTree for all ways in the given city map.
-Return 
+Return
 1. a mapping from id to the way id
 2. the kd tree
 3. The radius for a reasonable in range search (51% of the longest line between two nodes)
@@ -161,7 +161,7 @@ function get_way_kdtree(city_map)
 end
 
 """
-    filter_candidates!(candidates; closer_dist=25)  
+    filter_candidates!(candidates; closer_dist=25)
 
 Filter out candidates which are further away than `closer_dist` if there is at least candidate which is closer than `closer_dist`.
 """
@@ -194,7 +194,7 @@ function get_candidates(city_map, path)
         kps[:,i] .= getxy(p, trans)
     end
     idxs = inrange(way_tree, kps, radius)
-    
+
     candidates = Vector{Vector{Candidate}}()
     i = 0
     for p in path
@@ -273,9 +273,9 @@ function shortest_path_distance(from::Candidate, to::Candidate, city_map)
         if from.way_is_reverse != to.way_is_reverse
             return Inf
         end
-        # we assume we can travel in both directions 
+        # we assume we can travel in both directions
         d = to.λ-from.λ
-        if d >= 0 
+        if d >= 0
             return d
         end
     end
@@ -283,7 +283,7 @@ function shortest_path_distance(from::Candidate, to::Candidate, city_map)
     len_way_from = total_length(from.way)
     sp = shortest_candidate_path(from, to, city_map)
     sp_from_e_to_b = total_length(city_map, sp)
-    
+
     return  len_way_from - from.λ + sp_from_e_to_b + to.λ
 end
 
@@ -316,14 +316,25 @@ function filter_path(gps_points, dist)
     end
     push!(new_gps_points, gps_points[end])
     saved_perc = 100*(1-(length(new_gps_points)/length(gps_points)))
-    println("Saved $(saved_perc)%")
+    return new_gps_points
+end
+
+function filter_path(gps_points::Vector{GPX.GPXPoint}, dist)
+    new_gps_points = [gps_points[1]]
+    for i in 2:length(gps_points)-1
+        if euclidean_distance(LLA(new_gps_points[end].lat, new_gps_points[end].lon), LLA(gps_points[i].lat, gps_points[i].lon)) > dist
+            push!(new_gps_points, gps_points[i])
+        end
+    end
+    push!(new_gps_points, gps_points[end])
+    saved_perc = 100*(1-(length(new_gps_points)/length(gps_points)))
     return new_gps_points
 end
 
 """
     get_candidates_from_idx(vec_candidates, candidate_idxs)
 
-Return candidates from an nested vector of candiates like `[[c1,c2],[c3]]` and candiate_idxs which are 1d like `[1,3]` would return 
+Return candidates from an nested vector of candiates like `[[c1,c2],[c3]]` and candiate_idxs which are 1d like `[1,3]` would return
 `[c1, c3]`.
 """
 function get_candidates_from_idx(vec_candidates, candidate_idxs)
@@ -346,8 +357,11 @@ end
 
 function map_matching(city_map, gpxfile::GPXFile)
     streetpaths = Vector{StreetPath}()
+    i = 1
     for (idx, candidates) in enumerate(map_path(city_map, gpxfile))
-        push!(streetpaths, calculate_streetpath(gpxfile.name, idx, candidates, city_map))
+        new_streetpaths = calculate_streetpath(gpxfile.name, i, candidates, city_map)
+        append!(streetpaths, new_streetpaths)
+        i += length(new_streetpaths)
     end
     return streetpaths
 end
@@ -371,12 +385,12 @@ function map_path(city_map, gpxfile::GPXFile)
     current_start_idx = 0
     for (idx,candidates) in enumerate(vec_candidates)
         if state == :new
-            if length(candidates) > 0 
+            if length(candidates) > 0
                 current_start_idx = idx
                 state = :ongoing
             end
         end
-        if state == :ongoing 
+        if state == :ongoing
             if length(candidates) == 0
                 push!(idxs, (current_start_idx, idx-1))
                 current_start_idx = 0
@@ -388,7 +402,7 @@ function map_path(city_map, gpxfile::GPXFile)
         push!(idxs, (current_start_idx, length(vec_candidates)))
     end
     candidates = Vector{Vector{Candidate}}()
-    for tpl in idxs 
+    for tpl in idxs
         push!(candidates, map_path(city_map, vec_candidates[tpl[1]:tpl[2]]))
     end
     return candidates
@@ -397,12 +411,10 @@ end
 
 function map_path(city_map, vec_candidates::Vector{Vector{Candidate}})
     ncandidates = sum(length(cands) for cands in vec_candidates)
-    @show length(vec_candidates)
-    println("Average number of candidates: $(ncandidates / length(vec_candidates))")
     emission_probabilies = zeros((ncandidates, length(vec_candidates)+1))
     sidx = 1
     for (ci,candidates) in enumerate(vec_candidates)
-        emission_probabilies[sidx:sidx+length(candidates)-1, ci] = EverySingleStreet.get_candidate_probability.(candidates) 
+        emission_probabilies[sidx:sidx+length(candidates)-1, ci] = EverySingleStreet.get_candidate_probability.(candidates)
         sidx += length(candidates)
     end
     for i in 1:ncandidates
@@ -425,21 +437,19 @@ function map_path(city_map, vec_candidates::Vector{Vector{Candidate}})
             end
             if sum_probs == 0
                 transition_probabilities[sidx1,sidx2_orig:sidx2_orig+length(candidates2)-1] .= 1/length(candidates2)
-            else 
+            else
                 transition_probabilities[sidx1,:] ./= sum_probs
             end
             sidx1 +=1
         end
-       
+
     end
     len_last_candidates = length(vec_candidates[end])
     for i in ncandidates-len_last_candidates+1:ncandidates
         transition_probabilities[i, i] = 1.0
     end
-    println("Computed all probabilties")
-    @time hmm = HMM(transition_probabilities, emission_distributions)
-    println("Created hmm")
-    @time best_candidates_idx = viterbi(hmm, 1:length(vec_candidates))
+    hmm = HMM(transition_probabilities, emission_distributions)
+    best_candidates_idx = viterbi(hmm, 1:length(vec_candidates))
     best_candidates = get_candidates_from_idx(vec_candidates, best_candidates_idx)
     return best_candidates
 end
@@ -450,6 +460,7 @@ end
 Generate a `StreetPath` from a list of candidates obtained by [`map_path`](@ref).
 """
 function calculate_streetpath(name, subpath_id, candidates, city_map)
+    streetpaths = Vector{StreetPath}()
     segments = Vector{StreetSegment}()
     for ci in 2:length(candidates)
         current_candidate = candidates[ci-1]
@@ -460,14 +471,28 @@ function calculate_streetpath(name, subpath_id, candidates, city_map)
             else
                 next_candidate = get_reverse_candidate(next_candidate)
                 push!(segments, StreetSegment(current_candidate, next_candidate))
-            end 
+            end
         else
             sp = shortest_candidate_path(current_candidate, next_candidate, city_map)
             partial_segments = get_segments(city_map, current_candidate, next_candidate, sp)
-            append!(segments, partial_segments)
+            len_shortest_path =  total_length(city_map, sp)u"m"
+            start_time = current_candidate.measured_point.time
+            finish_time = next_candidate.measured_point.time
+            duration = Quantity(finish_time - start_time)
+            speed = uconvert(u"km/hr", len_shortest_path/duration)
+            if speed > 20u"km/hr"
+                push!(streetpaths, StreetPath(name, subpath_id, segments))
+                subpath_id += 1
+                segments = Vector{StreetSegment}()
+            else
+                append!(segments, partial_segments)
+            end
         end
     end
-    return StreetPath(name, subpath_id, segments)
+    if !isempty(segments)
+        push!(streetpaths, StreetPath(name, subpath_id, segments))
+    end
+    return streetpaths
 end
 
 
@@ -481,7 +506,7 @@ function get_segments(city_map, current_candidate, next_candidate, sp)
     origin_lla = get_centroid(city_map.nodes)
     trans = ENUfromLLA(origin_lla, wgs84)
     rev_trans = LLAfromENU(origin_lla, wgs84)
-    
+
     segments = Vector{StreetSegment}()
     if length(sp) == 2 && sp[1] == sp[2]
         nodeid = get_next_node_id(current_candidate)
@@ -535,7 +560,7 @@ function get_way_segments(original_sp, city_map)
     end
     return way_segments
 end
-    
+
 function longest_segment(city_map)
     origin_lla = get_centroid(city_map.nodes)
     trans = ENUfromLLA(origin_lla, wgs84)
@@ -623,32 +648,32 @@ function calculate_walked_parts(streetpaths::Vector{StreetPath}, city_map::Map)
     for way in city_map.ways
         if haskey(names, way.name)
             push!(names[way.name], way.id)
-        else 
+        else
             names[way.name] = [way.id]
         end
     end
 
     for streetpath in streetpaths
-        for segment in streetpath.segments 
+        for segment in streetpath.segments
             len_way = total_length(segment.from.way)
             start_λ = 0.0
             finish_λ = 0.0
             if segment.from.way_is_reverse
                 start_λ = len_way-segment.from.λ
                 finish_λ = len_way-segment.to.λ
-            else 
+            else
                 start_λ = segment.from.λ
                 finish_λ = segment.to.λ
             end
             start_λ, finish_λ = extrema((start_λ, finish_λ))
-            if start_λ == finish_λ 
+            if start_λ == finish_λ
                 continue
             end
             start_λ = clamp(start_λ-5, 0, len_way)
             finish_λ = clamp(finish_λ+5, 0, len_way)
             if !haskey(ways, segment.from.way.id)
                 ways[segment.from.way.id] = WalkedWay(segment.from.way, [(start_λ, finish_λ)])
-            else 
+            else
                 ranges = ways[segment.from.way.id].parts
                 push!(ranges, (start_λ, finish_λ))
                 ways = @set ways[segment.from.way.id].parts = merge_ranges(ranges)
@@ -693,7 +718,7 @@ function get_walked_street(walked_parts::WalkedParts, city_map::Map, name)
             walked_dist += sum(p[2]-p[1] for p in walked_way.parts)
             @show  walked_way.parts
             @show total_length(walked_way.way)
-        else 
+        else
             @show way_id
         end
     end
@@ -716,7 +741,7 @@ function get_candidate_on_way(way::Way, dist)
     to_idx = from_idx+1
     from_node = nodes[from_idx]
     to_node = nodes[to_idx]
-    
+
     t = 1-(cum_dists[to_idx]-dist)/ (cum_dists[to_idx]-cum_dists[from_idx])
     lla = LLA(get_interpolation_point(Point(from_node.lat, from_node.lon), Point(to_node.lat, to_node.lon), t)...)
     gpspoint = GPSPoint(lla, ZonedDateTime(now(), TimeZone("UTC")))
@@ -727,7 +752,7 @@ end
 function get_segments(walked_way::WalkedWay)
     segments = Vector{StreetSegment}()
     for part in walked_way.parts
-        
+
         from_candidate = get_candidate_on_way(walked_way.way, part[1])
         to_candidate = get_candidate_on_way(walked_way.way, part[2])
         push!(segments, StreetSegment(from_candidate, to_candidate))
@@ -739,7 +764,7 @@ function get_gps_points(segment)
     prev_from_idx = prev_idx(segment.from)+1
     prev_to_idx = prev_idx(segment.to)
     points = Vector{GPSPoint}()
-    if segment.from == segment.to 
+    if segment.from == segment.to
         return points
     end
     if prev_from_idx > prev_to_idx
@@ -825,4 +850,16 @@ function walked_parts_to_gpx(walked_parts::WalkedParts, gps_filename)
 
     save_file(xdoc, gps_filename)
     println("GPX file saved to \"$gps_filename\"")
+end
+
+function map_matching(city_map, folder, outpath)
+    streetpaths = get_gpx_paths(folder);
+
+    save_streetpaths(outpath, Vector{StreetPath}())
+
+    for path in streetpaths
+        @show path.name
+        new_streetpaths =  EverySingleStreet.map_matching(city_map, path);
+        EverySingleStreet.update_streetpaths!(outpath, new_streetpaths)
+    end
 end

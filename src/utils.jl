@@ -48,7 +48,7 @@ function parse_map(fpath)
         end
     end
     json_string = convert_keys_recursive(json)
-    graph = graph_from_object(json_string; weight_type=:distance, network_type=:drive)
+    graph = graph_from_object(json_string; weight_type=:distance, network_type=:all)
     return Map(graph, nodeid_to_local, wayid_to_local, nodes, ways)
 end
 
@@ -83,10 +83,12 @@ function combine_gpx_tracks(folder)
         track_segment = GPX.new_track_segment(track)
 
         gpxFile = GPX.read_gpx_file(joinpath(folder,fname))
+    
         @assert length(gpxFile.tracks) == 1
         @assert length(gpxFile.tracks[1].segments) == 1
     
-        for p in gpxFile.tracks[1].segments[1].points
+        points = filter_path(gpxFile.tracks[1].segments[1].points, 25)
+        for p in points
             point = GPX.GPXPoint(p.lat, p.lon, p.ele, p.time, p.desc)
             push!(track_segment, point)
         end
@@ -188,20 +190,20 @@ function save_streetpaths(filename, streetpaths::Vector{StreetPath})
     save(filename, Dict("streetpaths" => streetpaths))
 end
 
-function update_streetpaths!(filename, update_streetpaths::Vector{StreetPath})
+function update_streetpaths!(filename, update_streetpaths::Vector{StreetPath}; verbose=false)
     streetpaths = load(filename, "streetpaths")
     for streetpath in update_streetpaths
         replaced = false
         for (idx,saved_streetpath) in enumerate(streetpaths)
             if streetpath.name == saved_streetpath.name && streetpath.subpath_id == saved_streetpath.subpath_id
                 streetpaths[idx] = streetpath
-                println("Replaced streetpaths with name $(streetpath.name)")
+                verbose && println("Replaced streetpaths with name $(streetpath.name)")
                 replaced = true
                 break
             end
         end
         replaced && continue
-        println("Added streetpaths with name $(streetpath.name)")
+        verbose && println("Added streetpaths with name $(streetpath.name)")
         push!(streetpaths, streetpath)
     end
     save_streetpaths(filename, streetpaths)
