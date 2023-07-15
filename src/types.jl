@@ -14,12 +14,21 @@ struct Way
     access::String
 end
 
+struct BoundedAllShortestPaths
+    g::StaticGraphs.StaticDiGraph{Int32, Int32}
+    dist_mat::SparseArrays.SparseMatrixCSC{Float64, Int32}
+    distances::Vector{Dict{Int32, Float64}}
+    parents::Vector{Dict{Int32, Int32}}
+    distance::Float64
+end 
+
 struct Map
     graph::OSMGraph
     osm_id_to_node_id::Dict{Int, Int}
     osm_id_to_edge_id::Dict{Int, Int}
     nodes::Vector{Node}
     ways::Vector{Way}
+    bounded_shortest_paths::BoundedAllShortestPaths
 end
 
 struct GPSPoint 
