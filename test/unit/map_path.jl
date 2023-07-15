@@ -37,7 +37,8 @@ end
     gpxfile = EverySingleStreet.GPXFile("test", points)
 
     candidates = EverySingleStreet.map_path(city_map, gpxfile)
-    streetpath = EverySingleStreet.calculate_streetpath("test", 1, candidates[1], city_map)
+    streetpaths = EverySingleStreet.calculate_streetpath("test", 1, candidates[1], city_map)
+    streetpath = streetpaths[1]
     # check the segment properties
     for segment in streetpath.segments
         from = segment.from 

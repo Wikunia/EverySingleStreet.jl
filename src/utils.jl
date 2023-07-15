@@ -7,7 +7,7 @@ Download the road network of the given place and write it as a json file to the 
 function download(place_name, filepath)
     download_osm_network(
         :place_name;
-        network_type=:walk,
+        network_type=:drive,
         place_name,
         save_to_file_location=filepath
     )
@@ -43,12 +43,12 @@ function parse_map(fpath)
             element[:tags][:oneway] = "no"
             way_nodes = [nodes[nodeid_to_local[node_id]] for node_id in element[:nodes]]
             wayid_to_local[element[:id]] = way_counter
-            ways[way_counter] = Way(element[:id], way_nodes, get(element[:tags],:name, ""), get(element[:tags],:highway, ""))
+            ways[way_counter] = Way(element[:id], way_nodes, get(element[:tags],:name, ""), get(element[:tags],:highway, ""), get(element[:tags],:foot, ""), get(element[:tags],:access, ""))
             way_counter += 1
         end
     end
     json_string = convert_keys_recursive(json)
-    graph = graph_from_object(json_string; weight_type=:distance, network_type=:walk)
+    graph = graph_from_object(json_string; weight_type=:distance, network_type=:all)
     return Map(graph, nodeid_to_local, wayid_to_local, nodes, ways)
 end
 
@@ -67,7 +67,7 @@ function combine_gpx_tracks(folder)
     author = GPX.GPXAuthor("EverySingleStreet.jl")
 
     metadata = GPX.GPXMetadata(
-        name="07/11/2019 LFBI (09:32) LFBI (11:34)",
+        name="EverySingleStreet",
         author=author,
         time=now(localzone())
     )
@@ -83,10 +83,12 @@ function combine_gpx_tracks(folder)
         track_segment = GPX.new_track_segment(track)
 
         gpxFile = GPX.read_gpx_file(joinpath(folder,fname))
+    
         @assert length(gpxFile.tracks) == 1
         @assert length(gpxFile.tracks[1].segments) == 1
     
-        for p in gpxFile.tracks[1].segments[1].points
+        points = filter_path(gpxFile.tracks[1].segments[1].points, 25)
+        for p in points
             point = GPX.GPXPoint(p.lat, p.lon, p.ele, p.time, p.desc)
             push!(track_segment, point)
         end
@@ -188,20 +190,20 @@ function save_streetpaths(filename, streetpaths::Vector{StreetPath})
     save(filename, Dict("streetpaths" => streetpaths))
 end
 
-function update_streetpaths!(filename, update_streetpaths::Vector{StreetPath})
+function update_streetpaths!(filename, update_streetpaths::Vector{StreetPath}; verbose=false)
     streetpaths = load(filename, "streetpaths")
     for streetpath in update_streetpaths
         replaced = false
         for (idx,saved_streetpath) in enumerate(streetpaths)
             if streetpath.name == saved_streetpath.name && streetpath.subpath_id == saved_streetpath.subpath_id
                 streetpaths[idx] = streetpath
-                println("Replaced streetpaths with name $(streetpath.name)")
+                verbose && println("Replaced streetpaths with name $(streetpath.name)")
                 replaced = true
                 break
             end
         end
         replaced && continue
-        println("Added streetpaths with name $(streetpath.name)")
+        verbose && println("Added streetpaths with name $(streetpath.name)")
         push!(streetpaths, streetpath)
     end
     save_streetpaths(filename, streetpaths)
@@ -212,4 +214,16 @@ function add_streetpaths!(filename, added_streetpaths::Vector{StreetPath})
     streetpaths = load(filename, "streetpaths")
     append!(streetpaths, added_streetpaths)
     save_streetpaths(filename, streetpaths)
+end
+
+function iswalkable_road(way::Way)
+    way.highway in ["", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential", "living_street", "pedestrian", "secondary_link"] || return false
+    way.foot in ["no", "private", "discouraged"] && return false
+    way.access in ["no", "private", "customers"] && return false 
+    return true 
+end
+
+function iswalkable(way::Way)
+    iswalkable_road(way) && return true
+    return way.highway in ["footway", "track", "steps", "path", "service"]
 end

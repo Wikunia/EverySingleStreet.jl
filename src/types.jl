@@ -10,6 +10,8 @@ struct Way
     nodes::Vector{Node}
     name::String
     highway::String
+    foot::String
+    access::String
 end
 
 struct Map
@@ -55,4 +57,12 @@ struct StreetPath
     segments::Vector{StreetSegment}
 end
 
+struct WalkedWay
+    way::Way
+    parts::Vector{Tuple{Float64, Float64}}
+end
 
+struct WalkedParts
+    names::Dict{String, Vector{Int}} 
+    ways::Dict{Int, WalkedWay}
+end

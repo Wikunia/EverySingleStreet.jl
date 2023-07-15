@@ -72,7 +72,7 @@ function draw_fcts(city_map, fcts, outpath; scale_factor=0.1, original_point=not
         origin_lla = original_point
     end
     trans = ENUfromLLA(origin_lla, wgs84)
-    Drawing(2000, 2500, outpath)
+    Drawing(1920, 1080, outpath)
     origin()
     background("white")
     Luxor.scale(scale_factor,-scale_factor)
@@ -91,7 +91,9 @@ function draw_streetpaths(city_map, streetpaths, outpath; kwargs...)
             sethue("black")
             for way in city_map.ways
                 sethue("black")
-                draw_way(way, trans)
+                if iswalkable_road(way)
+                    draw_way(way, trans)
+                end
             end
         end
     ]
@@ -103,9 +105,27 @@ function draw_streetpaths(city_map, streetpaths, outpath; kwargs...)
     draw_fcts(city_map, [map_fcts..., streetpath_fcts...], outpath; kwargs...)
 end
 
+function create_images(city_map, streetpaths, folder; kwargs...)
+    is = Vector{Int}()
+    for i in 1:length(streetpaths)-1
+        if streetpaths[i].name == streetpaths[i+1].name 
+            continue
+        end
+        push!(is, i)
+    end
+    @show length(is)
+    c = 0
+    for i in is
+        str_c = lpad(c, 5, "0")
+        fname = joinpath(folder, "$str_c.png")
+        draw_streetpaths(city_map, streetpaths[1:i], fname; kwargs...)
+        c += 1
+    end
+end
+
 function draw_candidates(city_map, candidates, outpath; scale_factor=0.1, original_point=nothing)
     origin_lla = get_centroid(city_map.nodes)
-    origin_lla = candidates[1].lla
+    origin_lla = candidates[div(end,2)].lla
     trans = ENUfromLLA(origin_lla, wgs84)
     Drawing(1920, 1080, outpath)
     origin()
@@ -117,10 +137,10 @@ function draw_candidates(city_map, candidates, outpath; scale_factor=0.1, origin
         draw_way(way, trans)
     end
     sethue("green")
+    @show length(candidates)
     for c in candidates
         p = Point(getxy_from_lat_lon(c.lla.lat, c.lla.lon, trans))
         circle(p, 10, :fill)
-        # draw_way(c.way, trans)
     end
     sethue("blue")
     if original_point !== nothing 
