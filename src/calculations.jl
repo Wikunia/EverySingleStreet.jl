@@ -712,18 +712,22 @@ function get_walked_street(walked_parts::WalkedParts, city_map::Map, name)
     for way_id in way_ids
         local_way_id = city_map.osm_id_to_edge_id[way_id]
         way = city_map.ways[local_way_id]
-        complete_dist += total_length(way)
-        if haskey(walked_parts.ways, way_id)
-            walked_way = walked_parts.ways[way_id]
-            walked_dist += sum(p[2]-p[1] for p in walked_way.parts)
-            @show  walked_way.parts
-            @show total_length(walked_way.way)
-        else
-            @show way_id
-        end
+        l_walked_dist, l_complete_dist = get_walked_way(walked_parts, way)
+        walked_dist += l_walked_dist
+        complete_dist += l_complete_dist
     end
-    @show walked_dist
-    @show complete_dist
+    return walked_dist, complete_dist
+end
+
+function get_walked_way(walked_parts::WalkedParts, way)
+    complete_dist = 0.0
+    walked_dist = 0.0
+    complete_dist += total_length(way)
+    if haskey(walked_parts.ways, way.id)
+        walked_way = walked_parts.ways[way.id]
+        walked_dist += sum(p[2]-p[1] for p in walked_way.parts)
+    end
+    return walked_dist, complete_dist
 end
 
 function get_candidate_on_way(way::Way, dist)
@@ -862,4 +866,22 @@ function map_matching(city_map, folder, outpath)
         new_streetpaths =  EverySingleStreet.map_matching(city_map, path);
         EverySingleStreet.update_streetpaths!(outpath, new_streetpaths)
     end
+end
+
+function prev_idx(nodes, λ)
+    dists = [euclidean_distance(LLA(n1.lat, n1.lon), LLA(n2.lat, n2.lon)) for (n1,n2) in zip(nodes[1:end-1], nodes[2:end])]
+    cum_dists = cumsum(dists)
+    pos = findfirst(>=(λ), cum_dists)
+    if pos === nothing 
+        return length(cum_dists)
+    end
+    return pos
+end
+
+function prev_idx(candidate)
+    nodes = candidate.way.nodes
+    if candidate.way_is_reverse
+        nodes = reverse(nodes)
+    end
+    return prev_idx(nodes, candidate.λ)
 end

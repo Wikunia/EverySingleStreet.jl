@@ -52,20 +52,6 @@ function draw_segment(segment::StreetSegment, trans)
     draw_path(path, trans)
 end
 
-function prev_idx(candidate)
-    nodes = candidate.way.nodes
-    if candidate.way_is_reverse
-        nodes = reverse(nodes)
-    end
-    dists = [euclidean_distance(LLA(n1.lat, n1.lon), LLA(n2.lat, n2.lon)) for (n1,n2) in zip(nodes[1:end-1], nodes[2:end])]
-    cum_dists = cumsum(dists)
-    pos = findfirst(>=(candidate.λ), cum_dists)
-    if pos === nothing 
-        return length(cum_dists)
-    end
-    return pos
-end
-
 function draw_fcts(city_map, fcts, outpath; scale_factor=0.1, original_point=nothing)
     origin_lla = get_centroid(city_map.nodes)
     if !isnothing(original_point)

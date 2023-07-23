@@ -22,7 +22,7 @@ end
 
 Return a [`Map`](@ref) object from the given json file path that was created using the [`download`](@ref) function.
 """
-function parse_map(fpath)
+function parse_map(fpath, geojson_path=nothing)
     json = readjson(fpath)
     elements = json[:elements]
     counter = elements[1]
@@ -49,7 +49,8 @@ function parse_map(fpath)
     end
     json_string = convert_keys_recursive(json)
     graph = graph_from_object(json_string; weight_type=:distance, network_type=:all)
-    return Map(graph, nodeid_to_local, wayid_to_local, nodes, ways)
+    nodes_to_district_name = map_nodes_to_district(nodes, geojson_path)
+    return Map(graph, nodeid_to_local, wayid_to_local, nodes_to_district_name, nodes, ways)
 end
 
 function parse_gpx(fpath)
