@@ -14,6 +14,15 @@ struct Way
     access::String
 end
 
+struct HolePolygon 
+    outer::Vector{Point2{Float32}}
+    holes::Vector{Vector{Point2{Float32}}}
+end
+
+struct District
+    name::Symbol
+    polygons::Vector{HolePolygon}
+end
 struct BoundedAllShortestPaths
     g::StaticGraphs.StaticDiGraph{Int32, Int32}
     dist_mat::SparseArrays.SparseMatrixCSC{Float64, Int32}
@@ -26,6 +35,7 @@ struct Map
     graph::OSMGraph
     osm_id_to_node_id::Dict{Int, Int}
     osm_id_to_edge_id::Dict{Int, Int}
+    nodes_to_district_name::Vector{Symbol}
     nodes::Vector{Node}
     ways::Vector{Way}
     bounded_shortest_paths::BoundedAllShortestPaths
