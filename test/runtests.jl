@@ -9,4 +9,5 @@ using TimeZones
     include("unit/gpx.jl")
     include("unit/candidates.jl")
     include("unit/map_path.jl")
+    include("unit/shortest_path.jl")
 end

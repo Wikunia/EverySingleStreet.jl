@@ -258,7 +258,7 @@ function shortest_candidate_path(from::Candidate, to::Candidate, city_map)
     if sp_from_id == sp_to_id
         return [sp_from_id, sp_to_id]
     end
-    sp = shortest_path(city_map.graph, sp_from_id, sp_to_id)
+    sp = get_shortest_path(city_map, sp_from_id, sp_to_id)
     return sp
 end
 
