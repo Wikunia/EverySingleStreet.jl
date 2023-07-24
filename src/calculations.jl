@@ -712,18 +712,22 @@ function get_walked_street(walked_parts::WalkedParts, city_map::Map, name)
     for way_id in way_ids
         local_way_id = city_map.osm_id_to_edge_id[way_id]
         way = city_map.ways[local_way_id]
-        complete_dist += total_length(way)
-        if haskey(walked_parts.ways, way_id)
-            walked_way = walked_parts.ways[way_id]
-            walked_dist += sum(p[2]-p[1] for p in walked_way.parts)
-            @show  walked_way.parts
-            @show total_length(walked_way.way)
-        else
-            @show way_id
-        end
+        l_walked_dist, l_complete_dist = get_walked_way(walked_parts, way)
+        walked_dist += l_walked_dist
+        complete_dist += l_complete_dist
     end
-    @show walked_dist
-    @show complete_dist
+    return walked_dist, complete_dist
+end
+
+function get_walked_way(walked_parts::WalkedParts, way)
+    complete_dist = 0.0
+    walked_dist = 0.0
+    complete_dist += total_length(way)
+    if haskey(walked_parts.ways, way.id)
+        walked_way = walked_parts.ways[way.id]
+        walked_dist += sum(p[2]-p[1] for p in walked_way.parts)
+    end
+    return walked_dist, complete_dist
 end
 
 function get_candidate_on_way(way::Way, dist)
