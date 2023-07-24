@@ -863,3 +863,93 @@ function map_matching(city_map, folder, outpath)
         EverySingleStreet.update_streetpaths!(outpath, new_streetpaths)
     end
 end
+
+function prev_idx(nodes, λ)
+    dists = [euclidean_distance(LLA(n1.lat, n1.lon), LLA(n2.lat, n2.lon)) for (n1,n2) in zip(nodes[1:end-1], nodes[2:end])]
+    cum_dists = cumsum(dists)
+    pos = findfirst(>=(λ), cum_dists)
+    if pos === nothing 
+        return length(cum_dists)
+    end
+    return pos
+end
+
+function prev_idx(candidate)
+    nodes = candidate.way.nodes
+    if candidate.way_is_reverse
+        nodes = reverse(nodes)
+    end
+    return prev_idx(nodes, candidate.λ)
+end
+
+function get_gps_point(nodes, λ, trans, rev_trans)
+    dists = [euclidean_distance(LLA(n1.lat, n1.lon), LLA(n2.lat, n2.lon)) for (n1,n2) in zip(nodes[1:end-1], nodes[2:end])]
+    cum_dists = cumsum(dists)
+    pos = findfirst(>=(λ), cum_dists)
+    if pos === nothing 
+        return LLA(nodes[end].lat, nodes[end].lon)
+    end
+    next_pos = pos+1
+    seg_total_dist = dists[pos]
+    prev_dist = pos-1 > 0 ? cum_dists[pos-1] : 0.0
+    seg_dist = λ - prev_dist
+    t =  seg_dist/seg_total_dist
+    w1p = Point(getxy_from_lat_lon(nodes[pos].lat, nodes[pos].lon, trans))
+    w2p = Point(getxy_from_lat_lon(nodes[next_pos].lat, nodes[next_pos].lon, trans))
+    p_on_ab = get_lla(get_interpolation_point(w1p, w2p, t), rev_trans)
+
+    return p_on_ab
+end
+
+function create_xml(city_map::Map, walked_parts::WalkedParts, fname)
+    origin_lla = get_centroid(city_map.nodes)
+    trans = ENUfromLLA(origin_lla, wgs84)
+    rev_trans = LLAfromENU(origin_lla, wgs84)
+    gid = 0
+    ways = Vector{Way}()
+    for walked_way in values(walked_parts.ways)
+        nodes = walked_way.way.nodes
+        for part in walked_way.parts 
+            start_idx = prev_idx(nodes, part[1])
+            stop_idx = prev_idx(nodes, part[2])
+            part_nodes = Vector{Node}()
+            gid += 1
+            push!(part_nodes, Node(gid, get_gps_point(nodes, part[1], trans, rev_trans)))
+            for idx in start_idx:stop_idx
+                gid += 1
+                push!(part_nodes, Node(gid, nodes[idx].lat, nodes[idx].lon))
+            end
+            gid += 1
+            push!(part_nodes, Node(gid, get_gps_point(nodes, part[2], trans, rev_trans)))
+            gid += 1
+            push!(ways, Way(gid, part_nodes, walked_way.way.name, "walked", "yes", "yes"))
+        end
+    end
+    
+    zoned_now = ZonedDateTime(now(), TimeZone("UTC"))
+    xdoc = XMLDocument()
+    xroot = create_root(xdoc, "osm")
+    set_attributes(xroot, Dict("version"=>"0.6"))
+    child = new_child(xroot, "bounds")
+    set_attributes(child, Dict("minlon" => "7.96783", "minlat" => "53.39183", "maxlon" => "10.33196", "maxlat" => "54.06261"))
+
+    for way in ways
+        for node in way.nodes
+            child = new_child(xroot, "node")
+            set_attributes(child, Dict("id" => node.id, "lat" => node.lat, "lon" => node.lon, "version"=> "5", "timestamp" => zoned_now))
+        end
+    end
+    for way in ways
+        child = new_child(xroot, "way")
+        set_attributes(child, Dict("id" => way.id, "version" => "1", "timestamp" => zoned_now))
+        for node in way.nodes
+            nd = new_child(child, "nd")
+            set_attributes(nd, Dict("ref" => node.id))
+        end
+        tag = new_child(child, "tag")
+        set_attributes(tag, Dict("k" => "name", "v" => way.name))
+        tag = new_child(child, "tag")
+        set_attributes(tag, Dict("k" => "highway", "v" => "primary"))
+    end
+    save_file(xdoc, fname)
+end

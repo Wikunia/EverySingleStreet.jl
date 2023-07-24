@@ -5,6 +5,8 @@ struct Node
     lon::Float64
 end
 
+Node(id, lla::LLA) = Node(id, lla.lat, lla.lon)
+
 struct Way
     id::Int
     nodes::Vector{Node}

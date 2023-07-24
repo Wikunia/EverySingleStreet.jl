@@ -11,7 +11,7 @@ using HMMBase
 using JLD2
 using JSON3
 using LightOSM
-using LightXML: XMLDocument, save_file
+using LightXML: XMLDocument, save_file, create_root, new_child, add_text, set_attribute, set_attributes
 using Luxor
 using LinearAlgebra
 using NearestNeighbors
