@@ -23,6 +23,13 @@ struct District
     name::Symbol
     polygons::Vector{HolePolygon}
 end
+struct BoundedAllShortestPaths
+    g::StaticGraphs.StaticDiGraph{Int32, Int32}
+    dist_mat::SparseArrays.SparseMatrixCSC{Float64, Int32}
+    distances::Vector{Dict{Int32, Float64}}
+    parents::Vector{Dict{Int32, Int32}}
+    distance::Float64
+end 
 
 struct Map
     graph::OSMGraph
@@ -31,6 +38,7 @@ struct Map
     nodes_to_district_name::Vector{Symbol}
     nodes::Vector{Node}
     ways::Vector{Way}
+    bounded_shortest_paths::BoundedAllShortestPaths
 end
 
 struct GPSPoint 
