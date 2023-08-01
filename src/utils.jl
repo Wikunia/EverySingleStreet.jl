@@ -7,10 +7,41 @@ Download the road network of the given place and write it as a json file to the 
 function download(place_name, filepath)
     download_osm_network(
         :place_name;
-        network_type=:drive,
+        network_type=:all,
         place_name,
         save_to_file_location=filepath
     )
+    
+end
+
+function filter_walkable_json!(filepath)
+    json = readjson(filepath)
+    new_elements = Vector{Dict}()
+    removed_nways = 0
+    for element in json[:elements]
+        if element[:type] != "way"
+            push!(new_elements, element)
+            continue
+        end
+        new_way = Way(
+            element[:id], Vector{Node}(), 
+            get(element[:tags],:name, ""), 
+            get(element[:tags],:highway, ""), 
+            get(element[:tags],:foot, ""), 
+            get(element[:tags],:access, "")
+        )
+        if iswalkable(new_way)
+            push!(new_elements, element)
+            continue 
+        end
+        removed_nways += 1
+    end
+    json[:elements] = new_elements
+
+    open(filepath, "w") do f
+        JSON3.pretty(f, JSON3.write(json))
+        println(f)
+    end
 end
 
 function string_from_lla(lla::LLA)
@@ -28,30 +59,57 @@ function parse_map(fpath, geojson_path=nothing)
     counter = elements[1]
     @assert counter[:type] == "count"
     nodes = Vector{Node}(undef, parse(Int, counter[:tags][:nodes]))
-    ways = Vector{Way}(undef, parse(Int, counter[:tags][:ways]))
+    ways = Vector{Way}()
     nodeid_to_local = Dict{Int, Int}()
     wayid_to_local = Dict{Int, Int}()
+    osm_node_id_to_edge_ids = Dict{Int, Vector{Int}}()
     node_counter = 1
     way_counter = 1
+    encountered_first_way = false
+    walkable_road_nodes = [false]
     for element in elements
         if element[:type] == "node"
+            @assert !encountered_first_way
             nodeid_to_local[element[:id]] = node_counter
             nodes[node_counter] = Node(element[:id], element[:lat], element[:lon])
+            osm_node_id_to_edge_ids[element[:id]] = Vector{Int}()
             node_counter += 1
         end
         if element[:type] == "way"
+            if !encountered_first_way
+                walkable_road_nodes = zeros(Bool, node_counter-1)
+                encountered_first_way = true
+            end
             element[:tags][:oneway] = "no"
             way_nodes = [nodes[nodeid_to_local[node_id]] for node_id in element[:nodes]]
+            local_node_ids = [nodeid_to_local[node_id] for node_id in element[:nodes]]
+            new_way = Way(
+                element[:id], way_nodes, 
+                get(element[:tags],:name, ""), 
+                get(element[:tags],:highway, ""), 
+                get(element[:tags],:foot, ""), 
+                get(element[:tags],:access, ""),
+                total_length(way_nodes)
+            )
+            for node_id in element[:nodes]
+                push!(osm_node_id_to_edge_ids[node_id], way_counter)
+            end
             wayid_to_local[element[:id]] = way_counter
-            ways[way_counter] = Way(element[:id], way_nodes, get(element[:tags],:name, ""), get(element[:tags],:highway, ""), get(element[:tags],:foot, ""), get(element[:tags],:access, ""))
+            if iswalkable_road(new_way)
+                walkable_road_nodes[local_node_ids] .= true
+            end
+            push!(ways, new_way)
             way_counter += 1
         end
     end
+    @show count(way->iswalkable_road(way), ways)
     json_string = convert_keys_recursive(json)
-    graph = graph_from_object(json_string; weight_type=:distance, network_type=:all)
-    nodes_to_district_name = map_nodes_to_district(nodes, geojson_path)
-    bounded_shortets_paths = bounded_all_shortest_paths(graph.graph, graph.weights, 0.5)
-    return Map(graph, nodeid_to_local, wayid_to_local, nodes_to_district_name, nodes, ways, bounded_shortets_paths)
+    @time graph = graph_from_object(json_string; weight_type=:distance, network_type=:all)
+    @show nv(graph.graph)
+    @show ne(graph.graph)
+    @time nodes_to_district_name = map_nodes_to_district(nodes, geojson_path)
+    @time bounded_shortets_paths = bounded_all_shortest_paths(graph, 0.25, nodeid_to_local, walkable_road_nodes)
+    return Map(graph, nodeid_to_local, wayid_to_local, nodes_to_district_name, nodes, ways, bounded_shortets_paths, walkable_road_nodes, osm_node_id_to_edge_ids)
 end
 
 function parse_gpx(fpath)
@@ -150,11 +208,17 @@ function get_node(city_map::Map, nodeid)
     return city_map.nodes[city_map.osm_id_to_node_id[nodeid]]
 end
 
+function get_possible_ways(city_map, node_id)
+    way_ids = city_map.osm_node_id_to_edge_ids[node_id]
+    return city_map.ways[way_ids]
+end
+
 function get_first_way_segment(sp, city_map::Map)
     best_way_segment = nothing
+    possible_ways = get_possible_ways(city_map, sp[1])
     best_len = 0
     for (rev,func) in zip([false, true], [identity, reverse])
-        for way in city_map.ways
+        for way in possible_ways
             node_ids = func([n.id for n in way.nodes])
             last_idx = 0
             while last_idx !== nothing

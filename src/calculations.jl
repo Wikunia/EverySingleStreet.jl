@@ -54,8 +54,6 @@ end
 
 function get_candidate_on_way(node::Node, way::Way; rev=false)
     nodes = rev ? reverse(way.nodes) : way.nodes
-    node_ids = [n.id for n in nodes]
-    @assert node.id in node_ids
     lla = LLA(node.lat, node.lon)
     gpspoint = GPSPoint(lla, ZonedDateTime(now(), TimeZone("UTC")))
     λ = 0.0
@@ -200,6 +198,7 @@ function get_candidates(city_map, path)
     for p in path
         i += 1
         search_way_ids = unique(id_to_way_id[idxs[i]])
+        filter!(wid->iswalkable_road(city_map.ways[wid]), search_way_ids)
         p_candidates = get_matching_candidates(city_map, search_way_ids, p, origin_lla)
         filter_candidates!(p_candidates)
         push!(candidates, p_candidates)
@@ -224,6 +223,7 @@ Get the next node id given a candidate. This depends on `way_is_reverse` of the 
 Can be used to create a `StreetSegment`.
 """
 function get_next_node_id(candidate::Candidate)
+    @assert iswalkable_road(candidate.way)
     idx = prev_idx(candidate)+1
     nodes = candidate.way.nodes
     if candidate.way_is_reverse
@@ -239,6 +239,7 @@ Get the previous node id given a candidate. This depends on `way_is_reverse` of 
 Can be used to create a `StreetSegment`.
 """
 function get_prev_node_id(candidate::Candidate)
+    @assert iswalkable_road(candidate.way)
     idx = prev_idx(candidate)
     nodes = candidate.way.nodes
     if candidate.way_is_reverse
@@ -578,7 +579,12 @@ function longest_segment(city_map)
 end
 
 function segments(way::Way)
-    return [(LLA(node1.lat, node1.lon), LLA(node2.lat, node2.lon)) for (node1,node2) in zip(way.nodes[1:end-1], way.nodes[2:end])]
+    return segments(way.nodes)
+end
+
+
+function segments(nodes::Vector{Node})
+    return [(LLA(node1.lat, node1.lon), LLA(node2.lat, node2.lon)) for (node1,node2) in zip(nodes[1:end-1], nodes[2:end])]
 end
 
 function total_length(streetpath::StreetPath)
@@ -603,8 +609,12 @@ function total_length(city_map::Map, node_ids::Vector{Int})
 end
 
 function total_length(way::Way)
+    return way.meters
+end
+
+function total_length(nodes)
     dist = 0.0
-    for segment in segments(way)
+    for segment in segments(nodes)
         dist += euclidean_distance(segment...)
     end
     return dist
@@ -868,6 +878,33 @@ function map_matching(city_map, folder, outpath)
     end
 end
 
+function update_map_matching(city_map, folder, jld2_path)
+    streetpaths = get_gpx_paths(folder);
+    saved_streetpaths = Vector{StreetPath}()
+    if isfile(jld2_path)
+        saved_streetpaths = load(jld2_path)["streetpaths"]
+    end
+    saved_path_names = Set(streetpath.name for streetpath in saved_streetpaths)
+    # @show sort(collect(saved_path_names))
+    for path in streetpaths
+        path.name in saved_path_names && continue
+        @show path.name
+        new_streetpaths =  EverySingleStreet.map_matching(city_map, path);
+        append!(saved_streetpaths, new_streetpaths)
+        save_streetpaths(jld2_path, saved_streetpaths)
+    end
+    return saved_streetpaths
+end
+
+function full_update_routine(city_map, folder, jld2_path, output_folder=".")
+    streetpaths = update_map_matching(city_map, folder, jld2_path)
+    walked_parts = calculate_walked_parts(streetpaths, city_map);
+    xml_path = joinpath(output_folder, "walked.xml")
+    osm_path = joinpath(output_folder, "walked.osm.pbf")
+    create_xml(city_map, walked_parts, xml_path)
+    run(`osmosis --read-xml $xml_path --write-pbf $osm_path`)
+end
+
 function prev_idx(nodes, λ)
     dists = [euclidean_distance(LLA(n1.lat, n1.lon), LLA(n2.lat, n2.lon)) for (n1,n2) in zip(nodes[1:end-1], nodes[2:end])]
     cum_dists = cumsum(dists)
@@ -914,7 +951,7 @@ function create_xml(city_map::Map, walked_parts::WalkedParts, fname)
     for walked_way in values(walked_parts.ways)
         nodes = walked_way.way.nodes
         for part in walked_way.parts 
-            start_idx = prev_idx(nodes, part[1])
+            start_idx = prev_idx(nodes, part[1])+1
             stop_idx = prev_idx(nodes, part[2])
             part_nodes = Vector{Node}()
             gid += 1
@@ -926,7 +963,7 @@ function create_xml(city_map::Map, walked_parts::WalkedParts, fname)
             gid += 1
             push!(part_nodes, Node(gid, get_gps_point(nodes, part[2], trans, rev_trans)))
             gid += 1
-            push!(ways, Way(gid, part_nodes, walked_way.way.name, "walked", "yes", "yes"))
+            push!(ways, Way(gid, part_nodes, walked_way.way.name, "walked", "yes", "yes", total_length(part_nodes)))
         end
     end
     

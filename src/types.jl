@@ -14,6 +14,7 @@ struct Way
     highway::String
     foot::String
     access::String
+    meters::Float64
 end
 
 struct HolePolygon 
@@ -41,6 +42,8 @@ struct Map
     nodes::Vector{Node}
     ways::Vector{Way}
     bounded_shortest_paths::BoundedAllShortestPaths
+    walkable_road_nodes::Vector{Bool}
+    osm_node_id_to_edge_ids::Dict{Int, Vector{Int}}
 end
 
 struct GPSPoint 

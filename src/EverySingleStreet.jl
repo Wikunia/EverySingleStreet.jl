@@ -22,6 +22,7 @@ using OrderedCollections
 using Plots
 using Plots.PlotMeasures
 using PolygonInbounds
+using ProgressMeter
 using SparseArrays
 using StaticGraphs
 using Statistics
