@@ -81,7 +81,7 @@ struct StreetPath
     segments::Vector{StreetSegment}
 end
 
-struct WalkedWay
+mutable struct WalkedWay
     way::Way
     parts::Vector{Tuple{Float64, Float64}}
 end

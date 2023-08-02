@@ -356,11 +356,29 @@ function get_candidates_from_idx(vec_candidates, candidate_idxs)
     return candidates
 end
 
+function map_matching(fpath, city_ways::Vector{Way}, walked_parts::WalkedParts, map_local_path="tmp_local_map.json")
+    gps_points = get_gps_points(fpath)
+    name = basename(fpath)
+    bb = bbox(gps_points, 200)
+    EverySingleStreet.download(bb.south_west, bb.north_east, map_local_path)
+    filter_walkable_json!(map_local_path)
+    map_local = parse_map(map_local_path)
+    streetpaths = map_matching(map_local, name, gps_points)
+    prev_walked_road_km = total_length(walked_parts; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
+    walked_parts = calculate_walked_parts(streetpaths, city_ways, walked_parts.ways)
+    now_walked_road_km = total_length(walked_parts; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
+    return (walked_parts = walked_parts, added_kms = now_walked_road_km - prev_walked_road_km)
+end
+
 function map_matching(city_map, gpxfile::GPXFile)
+    return map_matching(city_map, gpxfile.name, gpxfile.gps_points)
+end
+
+function map_matching(city_map, gpx_name, gpxpoints::Vector{GPSPoint})
     streetpaths = Vector{StreetPath}()
     i = 1
-    for (idx, candidates) in enumerate(map_path(city_map, gpxfile))
-        new_streetpaths = calculate_streetpath(gpxfile.name, i, candidates, city_map)
+    for (idx, candidates) in enumerate(map_path(city_map, gpxpoints))
+        new_streetpaths = calculate_streetpath(gpx_name, i, candidates, city_map)
         append!(streetpaths, new_streetpaths)
         i += length(new_streetpaths)
     end
@@ -379,7 +397,11 @@ Map a path of gps points to the best matching candidates for the path.
 Return a list of lists of candidates as a path might not continously have candidates. Then it's split up into several parts.
 """
 function map_path(city_map, gpxfile::GPXFile)
-    gps_points = filter_path(gpxfile.gps_points, 25)
+    return map_path(city_map, gpxfile.gps_points)
+end
+
+function map_path(city_map, gps_points::Vector{GPSPoint}; point_dist=25)  
+    gps_points = filter_path(gps_points, point_dist)
     vec_candidates = EverySingleStreet.get_candidates(city_map, gps_points)
     idxs = Vector{Tuple{Int, Int}}()
     state = :new
@@ -456,7 +478,7 @@ function map_path(city_map, vec_candidates::Vector{Vector{Candidate}})
 end
 
 """
-    calculate_streetpath(ame, subpath_id, candidates, city_map)
+    calculate_streetpath(name, subpath_id, candidates, city_map)
 
 Generate a `StreetPath` from a list of candidates obtained by [`map_path`](@ref).
 """
@@ -621,8 +643,12 @@ function total_length(nodes)
 end
 
 function total_length(city_map::Map; filter_fct=(way)->true)
+    return total_length(city_map.ways; filter_fct)
+end
+
+function total_length(ways::Vector{Way}; filter_fct=(way)->true)
     dist = 0.0
-    for way in city_map.ways
+    for way in ways
         if filter_fct(way)
             dist += total_length(way)
         end
@@ -652,19 +678,20 @@ end
 
 
 
-function calculate_walked_parts(streetpaths::Vector{StreetPath}, city_map::Map)
+function calculate_walked_parts(streetpaths::Vector{StreetPath}, city_ways::Vector{Way}, walked_ways=Dict{Int, WalkedWay}())
     names = Dict{String, Vector{Int}}()
-    ways = Dict{Int, WalkedWay}()
-    for way in city_map.ways
+    for way in city_ways
         if haskey(names, way.name)
             push!(names[way.name], way.id)
         else
             names[way.name] = [way.id]
         end
     end
+    possible_way_ids = Set(way.id for way in city_ways)
 
     for streetpath in streetpaths
         for segment in streetpath.segments
+            segment.from.way.id in possible_way_ids || continue
             len_way = total_length(segment.from.way)
             start_λ = 0.0
             finish_λ = 0.0
@@ -681,17 +708,17 @@ function calculate_walked_parts(streetpaths::Vector{StreetPath}, city_map::Map)
             end
             start_λ = clamp(start_λ-5, 0, len_way)
             finish_λ = clamp(finish_λ+5, 0, len_way)
-            if !haskey(ways, segment.from.way.id)
-                ways[segment.from.way.id] = WalkedWay(segment.from.way, [(start_λ, finish_λ)])
+            if !haskey(walked_ways, segment.from.way.id)
+                walked_ways[segment.from.way.id] = WalkedWay(segment.from.way, [(start_λ, finish_λ)])
             else
-                ranges = ways[segment.from.way.id].parts
+                ranges = walked_ways[segment.from.way.id].parts
                 push!(ranges, (start_λ, finish_λ))
-                ways = @set ways[segment.from.way.id].parts = merge_ranges(ranges)
+                walked_ways[segment.from.way.id].parts = merge_ranges(ranges)
             end
         end
     end
 
-    return WalkedParts(names, ways)
+    return WalkedParts(names, walked_ways)
 end
 
 function merge_ranges(ranges::Vector{Tuple{T, T}}) where T
@@ -774,7 +801,7 @@ function get_segments(walked_way::WalkedWay)
     return segments
 end
 
-function get_gps_points(segment)
+function get_gps_points(segment::StreetSegment)
     prev_from_idx = prev_idx(segment.from)+1
     prev_to_idx = prev_idx(segment.to)
     points = Vector{GPSPoint}()

@@ -11,7 +11,19 @@ function download(place_name, filepath)
         place_name,
         save_to_file_location=filepath
     )
-    
+end
+
+function download(south_west::LLA, north_east::LLA, filepath)
+    minlat = south_west.lat
+    minlon = south_west.lon
+    maxlat = north_east.lat
+    maxlon = north_east.lon
+    download_osm_network(
+        :bbox;
+        network_type=:all,
+        minlat, minlon, maxlat, maxlon,
+        save_to_file_location=filepath
+    )
 end
 
 function filter_walkable_json!(filepath)
@@ -28,7 +40,8 @@ function filter_walkable_json!(filepath)
             get(element[:tags],:name, ""), 
             get(element[:tags],:highway, ""), 
             get(element[:tags],:foot, ""), 
-            get(element[:tags],:access, "")
+            get(element[:tags],:access, ""),
+            0.0
         )
         if iswalkable(new_way)
             push!(new_elements, element)
@@ -292,4 +305,29 @@ end
 function iswalkable(way::Way)
     iswalkable_road(way) && return true
     return way.highway in ["footway", "track", "steps", "path", "service"]
+end
+
+function get_gps_points(fpath)
+    strava_json = readjson(fpath)
+    start_time = ZonedDateTime(DateTime(strava_json[:start_time][1:end-1], "yyyy-mm-ddTHH:MM:SS"), tz"UTC")
+    gpx_points = Vector{GPSPoint}()
+    for (tdelta, latlon) in zip(strava_json[:times], strava_json[:latlon])
+        t = start_time+Second(tdelta)
+        gpx_point = GPSPoint(LLA(latlon[1], latlon[2]), t)
+        push!(gpx_points, gpx_point)
+    end
+    return gpx_points
+end
+
+function bbox(points::Vector{GPSPoint}, padding_m=0)
+    minlat, maxlat = extrema(p.pos.lat for p in points) 
+    minlon, maxlon = extrema(p.pos.lon for p in points) 
+    origin_lla = LLA((maxlat+minlat)/2, (minlon+maxlon)/2)
+    south_west = LLA(minlat, minlon)
+    north_east = LLA(maxlat, maxlon)
+    trans = ENUfromLLA(origin_lla, wgs84)
+    rev_trans = LLAfromENU(origin_lla, wgs84)
+    south_west = get_lla(trans(south_west)[1:2] .- [padding_m, padding_m], rev_trans)
+    north_east = get_lla(trans(north_east)[1:2] .+ [padding_m, padding_m], rev_trans)
+    return (south_west = south_west, north_east = north_east)
 end
