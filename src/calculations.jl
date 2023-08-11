@@ -925,11 +925,12 @@ end
 
 function full_update_routine(city_map, folder, jld2_path, output_folder=".")
     streetpaths = update_map_matching(city_map, folder, jld2_path)
-    walked_parts = calculate_walked_parts(streetpaths, city_map);
+    walked_parts = calculate_walked_parts(streetpaths, city_map.ways);
     xml_path = joinpath(output_folder, "walked.xml")
     osm_path = joinpath(output_folder, "walked.osm.pbf")
-    create_xml(city_map, walked_parts, xml_path)
+    create_xml(city_map.nodes, walked_parts, xml_path)
     run(`osmosis --read-xml $xml_path --write-pbf $osm_path`)
+    return walked_parts
 end
 
 function prev_idx(nodes, λ)
@@ -969,8 +970,8 @@ function get_gps_point(nodes, λ, trans, rev_trans)
     return p_on_ab
 end
 
-function create_xml(city_map::Map, walked_parts::WalkedParts, fname)
-    origin_lla = get_centroid(city_map.nodes)
+function create_xml(nodes::Vector{Node}, walked_parts::WalkedParts, fname)
+    origin_lla = get_centroid(nodes)
     trans = ENUfromLLA(origin_lla, wgs84)
     rev_trans = LLAfromENU(origin_lla, wgs84)
     gid = 0
