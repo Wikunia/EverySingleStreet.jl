@@ -226,6 +226,15 @@ function get_possible_ways(city_map, node_id)
     return city_map.ways[way_ids]
 end
 
+"""
+    get_first_way_segment(sp, city_map::Map)
+
+Return a way that includes the longest first part of the given shortest path 
+as well as the remaining shortest path which isn't part of this way.
+The return format consists of:
+- A named tuple describing the best way for the first segment: `(way::Way, rev::Bool, from::Int, to::Int)`
+- The remaining shortest path nodes
+"""
 function get_first_way_segment(sp, city_map::Map)
     best_way_segment = nothing
     possible_ways = get_possible_ways(city_map, sp[1])
