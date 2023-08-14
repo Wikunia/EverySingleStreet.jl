@@ -23,12 +23,12 @@ function get_lla(p, trans)
 end
 
 """
-    get_interpolation_val(p::Point, a::Point, b::Point)
+    get_interpolation_val(p::Point2, a::Point2, b::Point2)
 
 Get an interpolation value of point p between a line segment from a to b where a+t*(b-a) describes the point closes to p.
 Return p which is between 0 and 1.
 """
-function get_interpolation_val(p::Point, a::Point, b::Point)
+function get_interpolation_val(p::Point2, a::Point2, b::Point2)
     t_hat = dot(p-a, b-a)/norm(b-a)^2
 	t_star = clamp(t_hat, 0, 1)
     return t_star
@@ -42,11 +42,11 @@ Get the value of `a+t*(b-a)`
 get_interpolation_point(a, b, t::Float64) = a+t*(b-a)
 
 """
-    point_linesegment_distance(p::Point, a::Point, b::Point)
+    point_linesegment_distance(p::Point2, a::Point2, b::Point2)
 
 Get the smallest distance between point `p` and the line segment from `a` to `b`.
 """
-function point_linesegment_distance(p::Point, a::Point, b::Point)
+function point_linesegment_distance(p::Point2, a::Point2, b::Point2)
 	t = get_interpolation_val(p, a, b)
     p_on_ab = get_interpolation_point(a,b, t)
 	return norm(p_on_ab-p)
@@ -76,7 +76,7 @@ Get the best candidate of point `p` on the given `way`.
 `rev` can be set to true to reverse the direction of `way`.
 """
 function get_candidate_on_way(city_map, p, way::Way, trans, rev_trans; rev=false)
-    lp = Point(getxy(p, trans)...)
+    lp = Point2(getxy(p, trans)...)
     min_dist = Inf
     best_candidate = nothing
     cλ = 0.0
@@ -88,8 +88,8 @@ function get_candidate_on_way(city_map, p, way::Way, trans, rev_trans; rev=false
         if !haskey(city_map.graph.nodes, w1.id) ||  !haskey(city_map.graph.nodes, w2.id)
             continue
         end
-        w1p = Point(getxy_from_lat_lon(w1.lat, w1.lon, trans))
-        w2p = Point(getxy_from_lat_lon(w2.lat, w2.lon, trans))
+        w1p = Point2(getxy_from_lat_lon(w1.lat, w1.lon, trans))
+        w2p = Point2(getxy_from_lat_lon(w2.lat, w2.lon, trans))
         dist = point_linesegment_distance(lp, w1p, w2p)
         if dist < min_dist
             min_dist = dist
@@ -592,8 +592,8 @@ function longest_segment(city_map)
         for i in 1:length(way.nodes)-1
             w1 = way.nodes[i]
             w2 = way.nodes[i+1]
-            w1p = Point(getxy_from_lat_lon(w1.lat, w1.lon, trans))
-            w2p = Point(getxy_from_lat_lon(w2.lat, w2.lon, trans))
+            w1p = Point2(getxy_from_lat_lon(w1.lat, w1.lon, trans))
+            w2p = Point2(getxy_from_lat_lon(w2.lat, w2.lon, trans))
             max_dist = max(max_dist, norm(w1p-w2p))
         end
     end
@@ -784,7 +784,7 @@ function get_candidate_on_way(way::Way, dist)
     to_node = nodes[to_idx]
 
     t = 1-(cum_dists[to_idx]-dist)/ (cum_dists[to_idx]-cum_dists[from_idx])
-    lla = LLA(get_interpolation_point(Point(from_node.lat, from_node.lon), Point(to_node.lat, to_node.lon), t)...)
+    lla = LLA(get_interpolation_point(Point2(from_node.lat, from_node.lon), Point2(to_node.lat, to_node.lon), t)...)
     gpspoint = GPSPoint(lla, ZonedDateTime(now(), TimeZone("UTC")))
     candidate = Candidate(gpspoint, lla, way, false, 0.0, dist)
     return candidate
@@ -963,8 +963,8 @@ function get_gps_point(nodes, λ, trans, rev_trans)
     prev_dist = pos-1 > 0 ? cum_dists[pos-1] : 0.0
     seg_dist = λ - prev_dist
     t =  seg_dist/seg_total_dist
-    w1p = Point(getxy_from_lat_lon(nodes[pos].lat, nodes[pos].lon, trans))
-    w2p = Point(getxy_from_lat_lon(nodes[next_pos].lat, nodes[next_pos].lon, trans))
+    w1p = Point2(getxy_from_lat_lon(nodes[pos].lat, nodes[pos].lon, trans))
+    w2p = Point2(getxy_from_lat_lon(nodes[next_pos].lat, nodes[next_pos].lon, trans))
     p_on_ab = get_lla(get_interpolation_point(w1p, w2p, t), rev_trans)
 
     return p_on_ab
