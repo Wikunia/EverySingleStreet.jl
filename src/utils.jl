@@ -115,13 +115,10 @@ function parse_map(fpath, geojson_path=nothing)
             way_counter += 1
         end
     end
-    @show count(way->iswalkable_road(way), ways)
     json_string = convert_keys_recursive(json)
-    @time graph = graph_from_object(json_string; weight_type=:distance, network_type=:all)
-    @show nv(graph.graph)
-    @show ne(graph.graph)
-    @time nodes_to_district_name = map_nodes_to_district(nodes, geojson_path)
-    @time bounded_shortets_paths = bounded_all_shortest_paths(graph, 0.25, nodeid_to_local, walkable_road_nodes)
+    graph = graph_from_object(json_string; weight_type=:distance, network_type=:all)
+    nodes_to_district_name = map_nodes_to_district(nodes, geojson_path)
+    bounded_shortets_paths = bounded_all_shortest_paths(graph, 0.25, nodeid_to_local, walkable_road_nodes)
     return Map(graph, nodeid_to_local, wayid_to_local, nodes_to_district_name, nodes, ways, bounded_shortets_paths, walkable_road_nodes, osm_node_id_to_edge_ids)
 end
 
