@@ -36,15 +36,39 @@ end
 
 struct Map
     graph::OSMGraph
+    bounded_shortest_paths::BoundedAllShortestPaths
     osm_id_to_node_id::Dict{Int, Int}
     osm_id_to_edge_id::Dict{Int, Int}
     nodes_to_district_name::Vector{Symbol}
     nodes::Vector{Node}
     ways::Vector{Way}
-    bounded_shortest_paths::BoundedAllShortestPaths
     walkable_road_nodes::Vector{Bool}
     osm_node_id_to_edge_ids::Dict{Int, Vector{Int}}
 end
+
+struct NoGraphMap 
+    osm_id_to_node_id::Dict{Int, Int}
+    osm_id_to_edge_id::Dict{Int, Int}
+    nodes_to_district_name::Vector{Symbol}
+    nodes::Vector{Node}
+    ways::Vector{Way}
+    walkable_road_nodes::Vector{Bool}
+    osm_node_id_to_edge_ids::Dict{Int, Vector{Int}}
+end
+
+function Map(no_graph_map::NoGraphMap, graph::OSMGraph, bounded_shortest_paths::BoundedAllShortestPaths)
+    return Map(
+        graph, bounded_shortest_paths, 
+        no_graph_map.osm_id_to_node_id, 
+        no_graph_map.osm_id_to_edge_id,
+        no_graph_map.nodes_to_district_name,
+        no_graph_map.nodes,
+        no_graph_map.ways,
+        no_graph_map.walkable_road_nodes,
+        no_graph_map.osm_node_id_to_edge_ids,  
+    )
+end
+
 
 struct GPSPoint 
     pos::LLA

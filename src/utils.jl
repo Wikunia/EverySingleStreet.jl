@@ -61,12 +61,8 @@ function string_from_lla(lla::LLA)
     return "$(lla.lat) $(lla.lon)"
 end
 
-"""
-    parse_map(fpath)
 
-Return a [`Map`](@ref) object from the given json file path that was created using the [`download`](@ref) function.
-"""
-function parse_map(fpath, geojson_path=nothing)
+function parse_no_graph_map(fpath, geojson_path=nothing)
     json = readjson(fpath)
     elements = json[:elements]
     counter = elements[1]
@@ -115,11 +111,23 @@ function parse_map(fpath, geojson_path=nothing)
             way_counter += 1
         end
     end
+    
+    nodes_to_district_name = map_nodes_to_district(nodes, geojson_path)
+    return NoGraphMap(nodeid_to_local, wayid_to_local, nodes_to_district_name, nodes, ways, walkable_road_nodes, osm_node_id_to_edge_ids)
+end
+
+"""
+    parse_map(fpath)
+
+Return a [`Map`](@ref) object from the given json file path that was created using the [`download`](@ref) function.
+"""
+function parse_map(fpath, geojson_path=nothing)
+    no_graph_map = parse_no_graph_map(fpath, geojson_path)
+    json = readjson(fpath)
     json_string = convert_keys_recursive(json)
     graph = graph_from_object(json_string; weight_type=:distance, network_type=:all)
-    nodes_to_district_name = map_nodes_to_district(nodes, geojson_path)
-    bounded_shortets_paths = bounded_all_shortest_paths(graph, 0.25, nodeid_to_local, walkable_road_nodes)
-    return Map(graph, nodeid_to_local, wayid_to_local, nodes_to_district_name, nodes, ways, bounded_shortets_paths, walkable_road_nodes, osm_node_id_to_edge_ids)
+    bounded_shortest_paths = bounded_all_shortest_paths(graph, 0.25, no_graph_map.osm_id_to_node_id, no_graph_map.walkable_road_nodes)
+    return Map(no_graph_map, graph, bounded_shortest_paths)
 end
 
 function parse_gpx(fpath)
