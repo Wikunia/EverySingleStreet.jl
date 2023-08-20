@@ -1,3 +1,28 @@
+function add_district!(districts:: Vector{District}, name::String, geometry::GeoJSON.MultiPolygon)
+    hpolygons = Vector{HolePolygon}()
+    for polygon in geometry
+        outer = polygon[1]
+        holes = Vector{Vector{Tuple{Float32, Float32}}}()
+        if length(polygon) > 1
+            for hole in polygon[2:end]
+                push!(holes, hole)
+            end
+        end
+        push!(hpolygons, HolePolygon(outer, holes))
+    end
+    push!(districts, District(Symbol(name), hpolygons))
+end
+
+function add_district!(districts:: Vector{District}, name::String, geometry::GeoJSON.Polygon)
+    hpolygons = Vector{HolePolygon}()
+    for polygon in geometry.coordinates
+        holes = Vector{Vector{Tuple{Float32, Float32}}}()
+        push!(hpolygons, HolePolygon(polygon, holes))
+    end
+    push!(districts, District(Symbol(name), hpolygons))
+end
+
+
 """
     get_districts(geojson_fpath)
 
@@ -9,19 +34,8 @@ function get_districts(geojson_fpath)
     df_districts = DataFrame(districts) 
     districts = Vector{District}()
     for row in eachrow(df_districts)
-        hpolygons = Vector{HolePolygon}()
         geometry = row[:geometry]
-        for polygon in geometry
-            outer = polygon[1]
-            holes = Vector{Vector{Tuple{Float32, Float32}}}()
-            if length(polygon) > 1
-                for hole in polygon[2:end]
-                    push!(holes, hole)
-                end
-            end
-            push!(hpolygons, HolePolygon(outer, holes))
-        end
-        push!(districts, District(Symbol(row[:Stadtteil]), hpolygons))
+        add_district!(districts, row[:Stadtteil], geometry)
     end
     return districts
 end
@@ -82,7 +96,7 @@ function map_nodes_to_district(nodes::Vector{Node}, geojson_fpath)
     return node_district
 end
 
-function update_district_walked!(district_kms::AbstractDict{Symbol, Float64}, city_map::Map, walkedway::WalkedWay)
+function update_district_walked!(district_kms::AbstractDict{Symbol, Float64}, city_map::AbstractSimpleMap, walkedway::WalkedWay)
     way = walkedway.way
     nodes = way.nodes
     for part in walkedway.parts
@@ -107,7 +121,7 @@ function update_district_walked!(district_kms::AbstractDict{Symbol, Float64}, ci
     return district_kms
 end
 
-function get_missing_district_parts(city_map::Map, walked_parts::WalkedParts, district_name::Symbol)
+function get_missing_district_parts(city_map::AbstractSimpleMap, walked_parts::WalkedParts, district_name::Symbol)
     street_names = Set{String}()
     for way in city_map.ways
         check_way = false
@@ -131,7 +145,7 @@ function get_missing_district_parts(city_map::Map, walked_parts::WalkedParts, di
     @show street_names
 end
 
-function get_district_kms(city_map::Map, walked_ways::Vector{WalkedWay})
+function get_district_kms(city_map::AbstractSimpleMap, walked_ways::Vector{WalkedWay})
     district_kms = OrderedDict{Symbol, Float64}()
     for walked_way in walked_ways
         update_district_walked!(district_kms, city_map, walked_way)
@@ -140,7 +154,7 @@ function get_district_kms(city_map::Map, walked_ways::Vector{WalkedWay})
     return district_kms
 end
 
-function get_district_kms(city_map::Map)
+function get_district_kms(city_map::AbstractSimpleMap)
     district_kms = OrderedDict{Symbol, Float64}()
     for way in city_map.ways
         walked_way = WalkedWay(way, [(0.0, total_length(way))])
@@ -150,7 +164,7 @@ function get_district_kms(city_map::Map)
     return district_kms
 end
 
-function get_walked_district_perc(city_map::Map, walked_ways::Vector{WalkedWay})
+function get_walked_district_perc(city_map::AbstractSimpleMap, walked_ways::Vector{WalkedWay})
     walked_district_kms = get_district_kms(city_map, walked_ways)
     district_kms = get_district_kms(city_map)
     district_perc = OrderedDict{Symbol, Float64}()

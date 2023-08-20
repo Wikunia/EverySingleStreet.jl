@@ -17,3 +17,17 @@ end
     @test district_names == [:Eimsbüttel, :Rotherbaum, :Hohenfelde]
 end
 
+@testset "Lübeck walked districts" begin 
+    path = joinpath(@__DIR__, "..", "data", "Luebeck.json");
+    EverySingleStreet.download("Lübeck, Germany", path);
+    EverySingleStreet.filter_walkable_json!(path);
+    _, city_map = EverySingleStreet.parse_no_graph_map(path, joinpath(@__DIR__, "..", "data", "luebeck_districts.geojson"));
+
+    walked_parts = EverySingleStreet.WalkedParts(Dict{String, Vector{Int}}(), Dict{Int, EverySingleStreet.WalkedWay}())
+    nt = EverySingleStreet.map_matching(joinpath(@__DIR__, "..", "data", "strava_luebeck.json"), city_map.ways, walked_parts, "tmp_local_map.json");
+    rm("tmp_local_map.json")
+    @test nt.added_kms > 5
+    district_percentages = EverySingleStreet.get_walked_district_perc(city_map, collect(values(nt.walked_parts.ways)))
+    @test haskey(district_percentages, :Innenstadt)
+    @test haskey(district_percentages, Symbol("Sankt Lorenz Süd"))
+end
