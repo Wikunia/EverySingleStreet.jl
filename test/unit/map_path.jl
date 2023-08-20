@@ -48,4 +48,12 @@ end
     end
 end
 
+@testset "Map matching walked parts" begin
+    city_map = EverySingleStreet.parse_map(joinpath(@__DIR__, "..", "data", "CLZ.json"));
+    walked_parts = EverySingleStreet.WalkedParts(Dict{String, Vector{Int}}(), Dict{Int, EverySingleStreet.WalkedWay}())
+    nt = EverySingleStreet.map_matching(joinpath(@__DIR__, "..", "data", "strava_hamburg.json"), city_map.ways, walked_parts, "tmp_local_map.json")
+    @test nt.added_kms ≈ 0.0
+    rm("tmp_local_map")
+end
+
 end

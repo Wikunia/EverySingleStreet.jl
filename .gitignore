@@ -2,3 +2,4 @@ test/current
 Manifest.toml
 docs/build
 .github
+test/data/CLZ.json
