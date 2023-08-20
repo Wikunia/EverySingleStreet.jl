@@ -105,6 +105,8 @@ function update_district_walked!(district_kms::AbstractDict{Symbol, Float64}, ci
         for i in start_id:stop_id-1
             node = nodes[i]
             next_node = nodes[i+1]
+            haskey(city_map.osm_id_to_node_id, node.id) || continue
+            haskey(city_map.osm_id_to_node_id, next_node.id) || continue
             internal_node_id = city_map.osm_id_to_node_id[node.id]
             next_internal_node_id = city_map.osm_id_to_node_id[next_node.id]
             district = city_map.nodes_to_district_name[internal_node_id]
@@ -145,18 +147,20 @@ function get_missing_district_parts(city_map::AbstractSimpleMap, walked_parts::W
     @show street_names
 end
 
-function get_district_kms(city_map::AbstractSimpleMap, walked_ways::Vector{WalkedWay})
+function get_district_kms(city_map::AbstractSimpleMap, walked_ways::Vector{WalkedWay}; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))
     district_kms = OrderedDict{Symbol, Float64}()
     for walked_way in walked_ways
+        filter_fct(walked_way.way) || continue
         update_district_walked!(district_kms, city_map, walked_way)
     end
     sort!(district_kms; byvalue=true, rev=true)
     return district_kms
 end
 
-function get_district_kms(city_map::AbstractSimpleMap)
+function get_district_kms(city_map::AbstractSimpleMap; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))
     district_kms = OrderedDict{Symbol, Float64}()
     for way in city_map.ways
+        filter_fct(way) || continue
         walked_way = WalkedWay(way, [(0.0, total_length(way))])
         update_district_walked!(district_kms, city_map, walked_way)
     end
