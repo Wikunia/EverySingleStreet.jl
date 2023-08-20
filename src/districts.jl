@@ -161,15 +161,3 @@ function get_walked_district_perc(city_map::Map, walked_ways::Vector{WalkedWay})
     sort!(district_perc; byvalue=true, rev=true)
     return district_perc
 end
-
-function plot_walked_perc(district_perc; leq=0, fname="district_km")
-    district_perc = filter(((k,v),)->v >= leq, district_perc)
-    @show district_perc
-    names = string.(keys(district_perc))
-    percs = collect(values(district_perc))
-    margin = PlotMeasures.cm
-    plt = plot(;title="Percentage walked per district\nDistricts with more than $leq% walked", xlabel="District", ylabel="Percentage walked", size=(900, 900), bottom_margin=margin, left_margin=margin)
-    bar!(plt, names, percs, xticks=(0.5:1:length(district_perc)-0.5, names), xrotation=45, label=nothing, yticks=(0:20:100, 0:20:100), ylims=(0,100))
-    png(plt, fname)
-end
-

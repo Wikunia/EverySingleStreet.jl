@@ -7,14 +7,113 @@ Download the road network of the given place and write it as a json file to the 
 function download(place_name, filepath)
     download_osm_network(
         :place_name;
-        network_type=:drive,
+        network_type=:all,
         place_name,
         save_to_file_location=filepath
     )
 end
 
+function download(south_west::LLA, north_east::LLA, filepath)
+    minlat = south_west.lat
+    minlon = south_west.lon
+    maxlat = north_east.lat
+    maxlon = north_east.lon
+    download_osm_network(
+        :bbox;
+        network_type=:all,
+        minlat, minlon, maxlat, maxlon,
+        save_to_file_location=filepath
+    )
+end
+
+function filter_walkable_json!(filepath)
+    json = readjson(filepath)
+    new_elements = Vector{Dict}()
+    removed_nways = 0
+    for element in json[:elements]
+        if element[:type] != "way"
+            push!(new_elements, element)
+            continue
+        end
+        new_way = Way(
+            element[:id], Vector{Node}(), 
+            get(element[:tags],:name, ""), 
+            get(element[:tags],:highway, ""), 
+            get(element[:tags],:foot, ""), 
+            get(element[:tags],:access, ""),
+            0.0
+        )
+        if iswalkable(new_way)
+            push!(new_elements, element)
+            continue 
+        end
+        removed_nways += 1
+    end
+    json[:elements] = new_elements
+
+    open(filepath, "w") do f
+        JSON3.pretty(f, JSON3.write(json))
+        println(f)
+    end
+end
+
 function string_from_lla(lla::LLA)
     return "$(lla.lat) $(lla.lon)"
+end
+
+
+function parse_no_graph_map(fpath, geojson_path=nothing)
+    json = readjson(fpath)
+    elements = json[:elements]
+    counter = elements[1]
+    @assert counter[:type] == "count"
+    nodes = Vector{Node}(undef, parse(Int, counter[:tags][:nodes]))
+    ways = Vector{Way}()
+    nodeid_to_local = Dict{Int, Int}()
+    wayid_to_local = Dict{Int, Int}()
+    osm_node_id_to_edge_ids = Dict{Int, Vector{Int}}()
+    node_counter = 1
+    way_counter = 1
+    encountered_first_way = false
+    walkable_road_nodes = [false]
+    for element in elements
+        if element[:type] == "node"
+            @assert !encountered_first_way
+            nodeid_to_local[element[:id]] = node_counter
+            nodes[node_counter] = Node(element[:id], element[:lat], element[:lon])
+            osm_node_id_to_edge_ids[element[:id]] = Vector{Int}()
+            node_counter += 1
+        end
+        if element[:type] == "way"
+            if !encountered_first_way
+                walkable_road_nodes = zeros(Bool, node_counter-1)
+                encountered_first_way = true
+            end
+            element[:tags][:oneway] = "no"
+            way_nodes = [nodes[nodeid_to_local[node_id]] for node_id in element[:nodes]]
+            local_node_ids = [nodeid_to_local[node_id] for node_id in element[:nodes]]
+            new_way = Way(
+                element[:id], way_nodes, 
+                get(element[:tags],:name, ""), 
+                get(element[:tags],:highway, ""), 
+                get(element[:tags],:foot, ""), 
+                get(element[:tags],:access, ""),
+                total_length(way_nodes)
+            )
+            for node_id in element[:nodes]
+                push!(osm_node_id_to_edge_ids[node_id], way_counter)
+            end
+            wayid_to_local[element[:id]] = way_counter
+            if iswalkable_road(new_way)
+                walkable_road_nodes[local_node_ids] .= true
+            end
+            push!(ways, new_way)
+            way_counter += 1
+        end
+    end
+    
+    nodes_to_district_name = map_nodes_to_district(nodes, geojson_path)
+    return NoGraphMap(nodeid_to_local, wayid_to_local, nodes_to_district_name, nodes, ways, walkable_road_nodes, osm_node_id_to_edge_ids)
 end
 
 """
@@ -23,35 +122,12 @@ end
 Return a [`Map`](@ref) object from the given json file path that was created using the [`download`](@ref) function.
 """
 function parse_map(fpath, geojson_path=nothing)
+    no_graph_map = parse_no_graph_map(fpath, geojson_path)
     json = readjson(fpath)
-    elements = json[:elements]
-    counter = elements[1]
-    @assert counter[:type] == "count"
-    nodes = Vector{Node}(undef, parse(Int, counter[:tags][:nodes]))
-    ways = Vector{Way}(undef, parse(Int, counter[:tags][:ways]))
-    nodeid_to_local = Dict{Int, Int}()
-    wayid_to_local = Dict{Int, Int}()
-    node_counter = 1
-    way_counter = 1
-    for element in elements
-        if element[:type] == "node"
-            nodeid_to_local[element[:id]] = node_counter
-            nodes[node_counter] = Node(element[:id], element[:lat], element[:lon])
-            node_counter += 1
-        end
-        if element[:type] == "way"
-            element[:tags][:oneway] = "no"
-            way_nodes = [nodes[nodeid_to_local[node_id]] for node_id in element[:nodes]]
-            wayid_to_local[element[:id]] = way_counter
-            ways[way_counter] = Way(element[:id], way_nodes, get(element[:tags],:name, ""), get(element[:tags],:highway, ""), get(element[:tags],:foot, ""), get(element[:tags],:access, ""))
-            way_counter += 1
-        end
-    end
     json_string = convert_keys_recursive(json)
     graph = graph_from_object(json_string; weight_type=:distance, network_type=:all)
-    nodes_to_district_name = map_nodes_to_district(nodes, geojson_path)
-    bounded_shortets_paths = bounded_all_shortest_paths(graph.graph, graph.weights, 0.5)
-    return Map(graph, nodeid_to_local, wayid_to_local, nodes_to_district_name, nodes, ways, bounded_shortets_paths)
+    bounded_shortest_paths = bounded_all_shortest_paths(graph, 0.25, no_graph_map.osm_id_to_node_id, no_graph_map.walkable_road_nodes)
+    return Map(no_graph_map, graph, bounded_shortest_paths)
 end
 
 function parse_gpx(fpath)
@@ -150,11 +226,26 @@ function get_node(city_map::Map, nodeid)
     return city_map.nodes[city_map.osm_id_to_node_id[nodeid]]
 end
 
+function get_possible_ways(city_map, node_id)
+    way_ids = city_map.osm_node_id_to_edge_ids[node_id]
+    return city_map.ways[way_ids]
+end
+
+"""
+    get_first_way_segment(sp, city_map::Map)
+
+Return a way that includes the longest first part of the given shortest path 
+as well as the remaining shortest path which isn't part of this way.
+The return format consists of:
+- A named tuple describing the best way for the first segment: `(way::Way, rev::Bool, from::Int, to::Int)`
+- The remaining shortest path nodes
+"""
 function get_first_way_segment(sp, city_map::Map)
     best_way_segment = nothing
+    possible_ways = get_possible_ways(city_map, sp[1])
     best_len = 0
     for (rev,func) in zip([false, true], [identity, reverse])
-        for way in city_map.ways
+        for way in possible_ways
             node_ids = func([n.id for n in way.nodes])
             last_idx = 0
             while last_idx !== nothing
@@ -228,4 +319,29 @@ end
 function iswalkable(way::Way)
     iswalkable_road(way) && return true
     return way.highway in ["footway", "track", "steps", "path", "service"]
+end
+
+function get_gps_points(fpath)
+    strava_json = readjson(fpath)
+    start_time = ZonedDateTime(DateTime(strava_json[:start_time][1:end-1], "yyyy-mm-ddTHH:MM:SS"), tz"UTC")
+    gpx_points = Vector{GPSPoint}()
+    for (tdelta, latlon) in zip(strava_json[:times], strava_json[:latlon])
+        t = start_time+Second(tdelta)
+        gpx_point = GPSPoint(LLA(latlon[1], latlon[2]), t)
+        push!(gpx_points, gpx_point)
+    end
+    return gpx_points
+end
+
+function bbox(points::Vector{GPSPoint}, padding_m=0)
+    minlat, maxlat = extrema(p.pos.lat for p in points) 
+    minlon, maxlon = extrema(p.pos.lon for p in points) 
+    origin_lla = LLA((maxlat+minlat)/2, (minlon+maxlon)/2)
+    south_west = LLA(minlat, minlon)
+    north_east = LLA(maxlat, maxlon)
+    trans = ENUfromLLA(origin_lla, wgs84)
+    rev_trans = LLAfromENU(origin_lla, wgs84)
+    south_west = get_lla(trans(south_west)[1:2] .- [padding_m, padding_m], rev_trans)
+    north_east = get_lla(trans(north_east)[1:2] .+ [padding_m, padding_m], rev_trans)
+    return (south_west = south_west, north_east = north_east)
 end

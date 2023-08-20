@@ -36,14 +36,21 @@ function bounded_dijkstra(graph, dist_mat, source, distance)
 end
 
 """
-    bounded_all_shortest_paths(g, dist_mat, distance)
+    bounded_all_shortest_paths(osm_graph, distance, nodeid_to_local, is_walkable_road)
 
 Call [`bounded_dijkstra`](@ref) for all nodes and return a `BoundedAllShortestPaths` object.
 """
-function bounded_all_shortest_paths(g, dist_mat, distance)
+function bounded_all_shortest_paths(osm_graph, distance, nodeid_to_local, is_walkable_road)
+    g = osm_graph.graph
+    dist_mat = osm_graph.weights
     all_distances = Vector{Dict{Int32, Float64}}(undef, nv(g))
     all_parents = Vector{Dict{Int32, Int32}}(undef, nv(g))
-    for i in 1:nv(g)
+    @showprogress for i in 1:nv(g)
+        if !is_walkable_road[nodeid_to_local[osm_graph.index_to_node[i]]]
+            # all_distances[i] = Dict{Int32, Float64}()
+            # all_parents[i] = Dict{Int32, Int32}()
+            continue
+        end
         distances, parents = bounded_dijkstra(g, dist_mat, i, distance)
         all_distances[i] = distances
         all_parents[i] = parents
