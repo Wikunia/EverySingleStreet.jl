@@ -976,7 +976,7 @@ function get_gps_point(nodes, λ, trans, rev_trans)
     return p_on_ab
 end
 
-function create_xml(nodes::Vector{Node}, walked_parts::WalkedParts, fname; districts=Vector{District}(), district_tags=Dict{Symbol, Vector{Symbol}}())
+function create_xml(nodes::Vector{Node}, walked_parts::WalkedParts, fname; districts=Vector{District}(), district_levels=Dict{Symbol, Int}())
     origin_lla = get_centroid(nodes)
     trans = ENUfromLLA(origin_lla, wgs84)
     rev_trans = LLAfromENU(origin_lla, wgs84)
@@ -1052,15 +1052,20 @@ function create_xml(nodes::Vector{Node}, walked_parts::WalkedParts, fname; distr
             relation = new_child(xroot, "relation")
             set_attributes(relation, Dict("id" => gid, "version"=> "5", "timestamp" => zoned_now))
             tag = new_child(relation, "tag")
-            set_attributes(tag, Dict("k" => "type", "v" => "multipolygon"))
+            set_attributes(tag, Dict("k" => "type", "v" => "boundary"))
             tag = new_child(relation, "tag")
             set_attributes(tag, Dict("k" => "name", "v" => district.name))
-            if haskey(district_tags, district.name)
-                for district_tag in district_tags[district.name] 
+
+            tag = new_child(relation, "tag")
+            set_attributes(tag, Dict("k" => "boundary", "v" => "administrative"))
+
+            if haskey(district_levels, district.name)
+                for district_level in district_levels[district.name] 
                     tag = new_child(relation, "tag")
-                    set_attributes(tag, Dict("k" => "landuse", "v" => district_tag))
+                    set_attributes(tag, Dict("k" => "admin_level", "v" => district_level))
                 end
             end
+            
             member = new_child(relation, "member")
             set_attributes(member, Dict("type" => "way", "ref" => gid+1, "role" => "outer"))
             for hi in 1:length(hpolygon.holes)
