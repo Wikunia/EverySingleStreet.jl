@@ -356,18 +356,24 @@ function get_candidates_from_idx(vec_candidates, candidate_idxs)
     return candidates
 end
 
-function map_matching(fpath, city_ways::Vector{Way}, walked_parts::WalkedParts, map_local_path="tmp_local_map.json")
-    gps_points = get_gps_points(fpath)
-    name = basename(fpath)
-    bb = bbox(gps_points, 200)
+function get_local_map(gps_points, map_local_path, padding=200)
+    bb = bbox(gps_points, padding)
     EverySingleStreet.download(bb.south_west, bb.north_east, map_local_path)
     filter_walkable_json!(map_local_path)
-    map_local = parse_map(map_local_path)
+    return parse_map(map_local_path)
+end
+
+function map_matching(fpath, city_ways::Vector{Way}, walked_parts::WalkedParts, map_local_path="tmp_local_map.json")
+    name = basename(fpath)
+    gps_points = get_gps_points(fpath)
+    map_local = get_local_map(gps_points, map_local_path)
     streetpaths = map_matching(map_local, name, gps_points)
     prev_walked_road_km = total_length(walked_parts; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
+    this_walked_parts = calculate_walked_parts(streetpaths, city_ways)
     walked_parts = calculate_walked_parts(streetpaths, city_ways, walked_parts.ways)
     now_walked_road_km = total_length(walked_parts; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
-    return (walked_parts = walked_parts, added_kms = now_walked_road_km - prev_walked_road_km)
+    this_walked_road_km = total_length(this_walked_parts; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
+    return (walked_parts = walked_parts, added_kms = now_walked_road_km - prev_walked_road_km, this_walked_road_km = this_walked_road_km)
 end
 
 function map_matching(city_map, gpxfile::GPXFile)
@@ -642,7 +648,7 @@ function total_length(nodes)
     return dist
 end
 
-function total_length(city_map::Map; filter_fct=(way)->true)
+function total_length(city_map::AbstractSimpleMap; filter_fct=(way)->true)
     return total_length(city_map.ways; filter_fct)
 end
 
