@@ -172,7 +172,11 @@ function get_walked_district_perc(city_map::AbstractSimpleMap, walked_ways::Vect
     walked_district_kms = get_district_kms(city_map, walked_ways)
     district_kms = get_district_kms(city_map)
     district_perc = OrderedDict{Symbol, Float64}()
-    for district in keys(walked_district_kms)
+    for district in keys(district_kms)
+        if !haskey(walked_district_kms, district)
+            district_perc[district] = 0.0
+            continue 
+        end
         district_perc[district] = 100 * (walked_district_kms[district] / district_kms[district])
     end
 
