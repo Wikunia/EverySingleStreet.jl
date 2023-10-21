@@ -369,9 +369,11 @@ function map_matching(fpath, city_ways::Vector{Way}, walked_parts::WalkedParts, 
     map_local = get_local_map(gps_points, map_local_path)
     streetpaths = map_matching(map_local, name, gps_points)
     prev_walked_road_km = total_length(walked_parts; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
+    this_walked_parts = calculate_walked_parts(streetpaths, city_ways)
     walked_parts = calculate_walked_parts(streetpaths, city_ways, walked_parts.ways)
     now_walked_road_km = total_length(walked_parts; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
-    return (walked_parts = walked_parts, added_kms = now_walked_road_km - prev_walked_road_km)
+    this_walked_road_km = total_length(this_walked_parts; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
+    return (walked_parts = walked_parts, added_kms = now_walked_road_km - prev_walked_road_km, this_walked_road_km = this_walked_road_km)
 end
 
 function map_matching(city_map, gpxfile::GPXFile)
