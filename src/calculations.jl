@@ -976,7 +976,7 @@ function get_gps_point(nodes, λ, trans, rev_trans)
     return p_on_ab
 end
 
-function create_xml(nodes::Vector{Node}, walked_parts::WalkedParts, fname)
+function create_xml(nodes::Vector{Node}, walked_parts::WalkedParts, fname; districts=Vector{District}(), district_tags=Dict{Symbol, Vector{Symbol}}())
     origin_lla = get_centroid(nodes)
     trans = ENUfromLLA(origin_lla, wgs84)
     rev_trans = LLAfromENU(origin_lla, wgs84)
@@ -1026,5 +1026,73 @@ function create_xml(nodes::Vector{Node}, walked_parts::WalkedParts, fname)
         tag = new_child(child, "tag")
         set_attributes(tag, Dict("k" => "highway", "v" => "primary"))
     end
+
+    for district in districts
+        for hpolygon in district.polygons
+            start_gid = gid+1
+            
+            for pos in hpolygon.outer
+                gid += 1
+                child = new_child(xroot, "node")
+                set_attributes(child, Dict("id" => gid, "lat" => pos[2], "lon" => pos[1], "version"=> "5", "timestamp" => zoned_now))
+            end
+            ids_outer = start_gid:gid
+            ids_holes = Vector{UnitRange{Int}}()
+            for hole in hpolygon.holes
+                start_gid = gid+1
+                for pos in hole
+                    gid += 1
+                    child = new_child(xroot, "node")
+                    set_attributes(child, Dict("id" => gid, "lat" => pos[2], "lon" => pos[1], "version"=> "5", "timestamp" => zoned_now))
+                end
+                push!(ids_holes, start_gid:gid)
+            end
+            
+            gid += 1
+            relation = new_child(xroot, "relation")
+            set_attributes(relation, Dict("id" => gid, "version"=> "5", "timestamp" => zoned_now))
+            tag = new_child(relation, "tag")
+            set_attributes(tag, Dict("k" => "type", "v" => "multipolygon"))
+            tag = new_child(relation, "tag")
+            set_attributes(tag, Dict("k" => "name", "v" => district.name))
+            if haskey(district_tags, district.name)
+                for district_tag in district_tags[district.name] 
+                    tag = new_child(relation, "tag")
+                    set_attributes(tag, Dict("k" => "landuse", "v" => district_tag))
+                end
+            end
+            member = new_child(relation, "member")
+            set_attributes(member, Dict("type" => "way", "ref" => gid+1, "role" => "outer"))
+            for hi in 1:length(hpolygon.holes)
+                member = new_child(relation, "member")
+                set_attributes(member, Dict("type" => "way", "ref" => gid+1+hi, "role" => "inner"))
+            end
+
+            way = new_child(xroot, "way")
+            set_attributes(way, Dict("type" => "way", "id" => gid+1, "version"=> "5", "timestamp" => zoned_now))
+            for id in ids_outer
+                nd = new_child(way, "nd")
+                set_attributes(nd, Dict("ref" => id))
+            end
+            if !isempty(ids_outer)
+                nd = new_child(way, "nd")
+                set_attributes(nd, Dict("ref" => ids_outer[1]))
+            end
+
+            for hi in  1:length(hpolygon.holes)
+                way = new_child(xroot, "way")
+                set_attributes(way, Dict("type" => "way", "id" => gid+1+hi, "version"=> "5", "timestamp" => zoned_now))
+                for id in ids_holes[hi]
+                    nd = new_child(way, "nd")
+                    set_attributes(nd, Dict("ref" => id))
+                end
+                if !isempty(ids_holes[hi])
+                    nd = new_child(way, "nd")
+                    set_attributes(nd, Dict("ref" => ids_holes[hi][1]))
+                end
+            end
+        end
+    end
+
     save_file(xdoc, fname)
 end
