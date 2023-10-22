@@ -1031,8 +1031,7 @@ function create_xml(nodes::Vector{Node}, walked_parts::WalkedParts, fname; distr
     for district in districts
         for hpolygon in district.polygons
             start_gid = gid+1
-            outer_polygon = simplify(hpolygon.outer)
-            for pos in outer_polygon
+            for pos in hpolygon.outer
                 gid += 1
                 child = new_child(xroot, "node")
                 set_attributes(child, Dict("id" => gid, "lat" => pos[2], "lon" => pos[1], "version"=> "5", "timestamp" => zoned_now))
