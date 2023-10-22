@@ -976,6 +976,7 @@ function get_gps_point(nodes, λ, trans, rev_trans)
     return p_on_ab
 end
 
+
 function create_xml(nodes::Vector{Node}, walked_parts::WalkedParts, fname; districts=Vector{District}(), district_levels=Dict{Symbol, Int}())
     origin_lla = get_centroid(nodes)
     trans = ENUfromLLA(origin_lla, wgs84)
@@ -1030,8 +1031,8 @@ function create_xml(nodes::Vector{Node}, walked_parts::WalkedParts, fname; distr
     for district in districts
         for hpolygon in district.polygons
             start_gid = gid+1
-            
-            for pos in hpolygon.outer
+            outer_polygon = simplify(hpolygon.outer)
+            for pos in outer_polygon
                 gid += 1
                 child = new_child(xroot, "node")
                 set_attributes(child, Dict("id" => gid, "lat" => pos[2], "lon" => pos[1], "version"=> "5", "timestamp" => zoned_now))
@@ -1053,8 +1054,9 @@ function create_xml(nodes::Vector{Node}, walked_parts::WalkedParts, fname; distr
             set_attributes(relation, Dict("id" => gid, "version"=> "5", "timestamp" => zoned_now))
             tag = new_child(relation, "tag")
             set_attributes(tag, Dict("k" => "type", "v" => "boundary"))
+            
             tag = new_child(relation, "tag")
-            set_attributes(tag, Dict("k" => "name", "v" => district.name))
+            set_attributes(tag, Dict("k" => "admin_level", "v" => "7"))
 
             tag = new_child(relation, "tag")
             set_attributes(tag, Dict("k" => "boundary", "v" => "administrative"))
@@ -1062,7 +1064,7 @@ function create_xml(nodes::Vector{Node}, walked_parts::WalkedParts, fname; distr
             if haskey(district_levels, district.name)
                 for district_level in district_levels[district.name] 
                     tag = new_child(relation, "tag")
-                    set_attributes(tag, Dict("k" => "admin_level", "v" => district_level))
+                    set_attributes(tag, Dict("k" => "name", "v" => district_level))
                 end
             end
             
