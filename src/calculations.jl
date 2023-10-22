@@ -1055,7 +1055,7 @@ function create_xml(nodes::Vector{Node}, walked_parts::WalkedParts, fname; distr
             set_attributes(tag, Dict("k" => "type", "v" => "boundary"))
             
             tag = new_child(relation, "tag")
-            set_attributes(tag, Dict("k" => "admin_level", "v" => "7"))
+            set_attributes(tag, Dict("k" => "admin_level", "v" => "9"))
 
             tag = new_child(relation, "tag")
             set_attributes(tag, Dict("k" => "boundary", "v" => "administrative"))
