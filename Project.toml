@@ -33,6 +33,7 @@ TimeZones = "f269a46b-ccf7-5d73-abea-4c690281aa53"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [compat]
+Distributions = "0.25"
 Geodesy = "1"
 JSON3 = "1"
 LightOSM = "0.2.8"
