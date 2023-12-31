@@ -112,8 +112,9 @@ function parse_no_graph_map(fpath, geojson_path=nothing)
         end
     end
     
+    districts = get_districts(geojson_path) 
     nodes_to_district_name = map_nodes_to_district(nodes, geojson_path)
-    return json, NoGraphMap(nodeid_to_local, wayid_to_local, nodes_to_district_name, nodes, ways, walkable_road_nodes, osm_node_id_to_edge_ids)
+    return json, NoGraphMap(nodeid_to_local, wayid_to_local, nodes_to_district_name, nodes, ways, walkable_road_nodes, osm_node_id_to_edge_ids, districts)
 end
 
 """

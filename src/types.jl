@@ -44,6 +44,7 @@ struct NoGraphMap <: AbstractSimpleMap
     ways::Vector{Way}
     walkable_road_nodes::Vector{Bool}
     osm_node_id_to_edge_ids::Dict{Int, Vector{Int}}
+    districts::Vector{District}
 end
 struct Map <: AbstractSimpleMap
     no_graph_map::NoGraphMap

@@ -29,6 +29,11 @@ end
 Parse the districts in the given file which needs to have :geometry and :Stadtteil as properties.
 Return a vector of [`District`](@ref)
 """
+function get_districts(::Nothing)
+    districts = Vector{District}()
+    return districts
+end
+
 function get_districts(geojson_fpath)
     districts = GeoJSON.read(read(geojson_fpath))
     df_districts = DataFrame(districts) 
