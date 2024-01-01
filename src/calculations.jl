@@ -356,21 +356,95 @@ function get_candidates_from_idx(vec_candidates, candidate_idxs)
     return candidates
 end
 
-function get_local_map(gps_points, map_local_path, padding=200)
-    bb = bbox(gps_points, padding)
-    EverySingleStreet.download(bb.south_west, bb.north_east, map_local_path)
-    filter_walkable_json!(map_local_path)
+function create_local_json(city_map, node_ids_start, fpath)
+    way_ids = Vector{Int}()
+    osm_node_ids = [city_map.nodes[i].id for i in node_ids_start]
+    for osm_node_id in osm_node_ids
+        append!(way_ids, city_map.osm_node_id_to_edge_ids[osm_node_id])
+    end
+    unique!(way_ids)
+    ways = [city_map.ways[way_id] for way_id in way_ids]
+    osm_node_ids = Set{Int}()
+    for way in ways
+        union!(osm_node_ids, [n.id for n in way.nodes])
+    end
+
+    nodes = [city_map.nodes[city_map.osm_id_to_node_id[i]] for i in osm_node_ids]
+    json = Dict{Symbol, Any}()
+    json[:version] = 0.6
+    json[:elements] = Vector{Dict{Symbol, Any}}()
+    element = Dict{Symbol, Any}()
+    element[:id] = 0
+    element[:type] = "count"
+    element[:tags] = Dict{Symbol, Any}()
+    element[:tags][:relations] = "0"
+    element[:tags][:nodes] = "$(length(nodes))"
+    element[:tags][:ways]  = "$(length(ways))"
+    element[:tags][:total] = "$(length(nodes)+length(ways))"
+    push!(json[:elements], element)
+
+    for node in nodes 
+        element = Dict{Symbol, Any}()
+        element[:id] = node.id
+        element[:type] = "node"
+        element[:lat] = node.lat
+        element[:lon] = node.lon
+        push!(json[:elements], element)
+    end
+
+    for way in ways 
+        element = Dict{Symbol, Any}()
+        element[:id] = way.id
+        element[:type] = "way"
+        element[:nodes] = [node.id for node in way.nodes]
+        element[:tags] = Dict{Symbol, String}()
+        element[:tags][:highway] = way.highway
+        element[:tags][:foot] = way.foot
+        element[:tags][:access] = way.access
+
+        push!(json[:elements], element)
+    end
+
+    open(fpath, "w") do f
+        JSON3.write(f, json)
+        println(f)
+    end
+end
+
+function get_local_map(city_map, gps_points, map_local_path, padding=200)
+    # build kd tree with gps points 
+    origin_lla = get_centroid(city_map.nodes)
+    trans = ENUfromLLA(origin_lla, wgs84)
+    transformed_points = Vector{Point2{Float64}}()
+    for point in gps_points
+        transformed_point = Point2(getxy_from_lat_lon(point.pos.lat, point.pos.lon, trans))
+        push!(transformed_points, transformed_point)
+    end
+    kd_tree = KDTree(transformed_points)
+
+    node_transformed_points = Vector{Point2{Float64}}()
+    for node in city_map.nodes
+        transformed_point = Point2(getxy_from_lat_lon(node.lat, node.lon, trans))
+        push!(node_transformed_points, transformed_point)
+    end
+    _, dists = nn(kd_tree, node_transformed_points)
+    node_ids = findall(<=(500), dists)
+    create_local_json(city_map, node_ids, map_local_path)
+
     return parse_map(map_local_path)
 end
 
-function map_matching(fpath, city_ways::Vector{Way}, walked_parts::WalkedParts, map_local_path="tmp_local_map.json")
+function map_matching(fpath, city_map::AbstractSimpleMap, walked_parts::WalkedParts, map_local_path="tmp_local_map.json")
     name = basename(fpath)
     gps_points = get_gps_points(fpath)
-    map_local = get_local_map(gps_points, map_local_path)
+    map_local = get_local_map(city_map, gps_points, map_local_path)
+    if isempty(map_local.ways)
+        return (walked_parts = walked_parts, added_kms = 0.0, this_walked_road_km = 0.0)     
+    end
     streetpaths = map_matching(map_local, name, gps_points)
     prev_walked_road_km = total_length(walked_parts; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
-    this_walked_parts = calculate_walked_parts(streetpaths, city_ways)
-    walked_parts = calculate_walked_parts(streetpaths, city_ways, walked_parts.ways)
+    this_walked_parts = calculate_walked_parts(streetpaths, city_map.ways)
+    walked_parts = calculate_walked_parts(streetpaths, city_map.ways, walked_parts.ways)
     now_walked_road_km = total_length(walked_parts; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
     this_walked_road_km = total_length(this_walked_parts; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
     return (walked_parts = walked_parts, added_kms = now_walked_road_km - prev_walked_road_km, this_walked_road_km = this_walked_road_km)
