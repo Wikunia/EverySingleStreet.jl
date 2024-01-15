@@ -52,7 +52,7 @@ function filter_walkable_json!(filepath)
     json[:elements] = new_elements
 
     open(filepath, "w") do f
-        JSON3.pretty(f, JSON3.write(json))
+        JSON3.write(f, json)
         println(f)
     end
 end
