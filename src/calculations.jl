@@ -1050,7 +1050,7 @@ function get_gps_point(nodes, λ, trans, rev_trans)
     return p_on_ab
 end
 
-function create_ways_from_walked_parts(walked_parts::WalkedParts)
+function get_ways_from_walked_parts(walked_parts::WalkedParts)
     origin_lla = get_centroid(walked_parts)
     trans = ENUfromLLA(origin_lla, wgs84)
     rev_trans = LLAfromENU(origin_lla, wgs84)
@@ -1078,7 +1078,8 @@ function create_ways_from_walked_parts(walked_parts::WalkedParts)
 end
 
 function create_xml(all_nodes::Vector{Node}, walked_parts::WalkedParts, fname; districts=Vector{District}(), district_levels=Dict{Symbol, Int}())
-    ways = create_ways_from_walked_parts(walked_parts)
+    ways = get_ways_from_walked_parts(walked_parts)
+    gid = ways[end].id
     
     zoned_now = ZonedDateTime(now(), TimeZone("UTC"))
     xdoc = XMLDocument()
