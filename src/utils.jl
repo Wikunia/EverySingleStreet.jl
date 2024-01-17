@@ -189,6 +189,25 @@ function get_gpx_paths(folder)
     return [parse_gpx(joinpath(folder,fname)) for fname in readdir(folder) if splitext(fname)[2] == ".gpx"]
 end
 
+function get_centroid(walked_parts::WalkedParts)
+    node_ids = Set{Int}()
+    nodes = Vector{Node}()
+    for (name, walked_way) in walked_parts.ways
+        for node in walked_way.way.nodes 
+            node.id in node_ids && continue
+            push!(node_ids, node.id)
+            push!(nodes, node)
+        end
+    end 
+    return get_centroid(nodes)
+end
+
+function get_centroid(points::Vector{GPSPoint})
+    lon = mean(point.pos.lon for point in points)
+    lat = mean(point.pos.lat for point in points)
+    return LLA(lat, lon)
+end
+
 function get_centroid(nodes::Vector{Node})
     lon = mean(node.lon for node in nodes)
     lat = mean(node.lat for node in nodes)
@@ -360,4 +379,78 @@ end
     else
         getfield(map, s)
     end
+end
+
+"""
+Use a non-recursive Douglas-Peucker algorithm to simplify a polygon. Used by `simplify()`.
+
+    douglas_peucker(pointlist::Array, start_index, last_index, epsilon)
+"""
+function douglas_peucker(pointlist::Vector, start_index, last_index, epsilon)
+    temp_stack = Tuple{Int, Int}[]
+    push!(temp_stack, (start_index, last_index))
+    global_start_index = start_index
+    keep_list = trues(length(pointlist))
+    while length(temp_stack) > 0
+        start_index = first(temp_stack[end])
+        last_index =  last(temp_stack[end])
+        pop!(temp_stack)
+        dmax = 0.0
+        index = start_index
+        for i in index + 1:last_index - 1
+            if (keep_list[i - global_start_index])
+                d = pointlinedistance(pointlist[i], pointlist[start_index], pointlist[last_index])
+                if d > dmax
+                    index = i
+                    dmax = d
+                end
+            end
+        end
+        if dmax > epsilon
+            push!(temp_stack, (start_index, index))
+            push!(temp_stack, (index, last_index))
+        else
+            for i in start_index + 2:last_index - 1 # 2 seems to keep the starting point...
+                keep_list[i - global_start_index] = false
+            end
+        end
+    end
+    return pointlist[keep_list]
+end
+
+"""
+Simplify a polygon:
+
+    simplify(pointlist::Array, detail=0.1)
+
+`detail` is the maximum approximation error of simplified polygon.
+"""
+function simplify(pointlist::Vector{GPSPoint}, detail=0.1)
+    origin_lla = get_centroid(pointlist)
+    trans = ENUfromLLA(origin_lla, wgs84)
+    transformed_points = Vector{Point2{Float64}}()
+    for point in pointlist
+        transformed_point = Point2(getxy_from_lat_lon(point.pos.lat, point.pos.lon, trans))
+        push!(transformed_points, transformed_point)
+    end
+
+    simplified = douglas_peucker(transformed_points, 1, length(transformed_points), detail)
+    gps_points = Vector{GPSPoint}()
+    for p in simplified 
+        idx = findfirst(==(p), transformed_points)
+        @assert !isnothing(idx)
+        push!(gps_points, pointlist[idx])
+    end
+    return gps_points
+end
+
+"""
+    pointlinedistance(p::Point2, a::Point2, b::Point2)
+
+Find the distance between a point `p` and a line between two points `a` and `b`.
+"""
+function pointlinedistance(p::Point2, a::Point2, b::Point2)
+  dx = b[1] - a[1]
+  dy = b[2] - a[2]
+  return abs(p[1] * dy - p[2] * dx + b[1] * a[2] - b[2] * a[1]) / hypot(dx, dy);
 end

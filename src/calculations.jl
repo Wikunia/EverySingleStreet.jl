@@ -480,8 +480,8 @@ function map_path(city_map, gpxfile::GPXFile)
     return map_path(city_map, gpxfile.gps_points)
 end
 
-function map_path(city_map, gps_points::Vector{GPSPoint}; point_dist=25)  
-    gps_points = filter_path(gps_points, point_dist)
+function map_path(city_map, gps_points::Vector{GPSPoint}; point_dist=5)  
+    gps_points = simplify(gps_points, point_dist)
     vec_candidates = EverySingleStreet.get_candidates(city_map, gps_points)
     idxs = Vector{Tuple{Int, Int}}()
     state = :new
@@ -1050,9 +1050,8 @@ function get_gps_point(nodes, λ, trans, rev_trans)
     return p_on_ab
 end
 
-
-function create_xml(nodes::Vector{Node}, walked_parts::WalkedParts, fname; districts=Vector{District}(), district_levels=Dict{Symbol, Int}())
-    origin_lla = get_centroid(nodes)
+function get_ways_from_walked_parts(walked_parts::WalkedParts)
+    origin_lla = get_centroid(walked_parts)
     trans = ENUfromLLA(origin_lla, wgs84)
     rev_trans = LLAfromENU(origin_lla, wgs84)
     gid = 0
@@ -1075,6 +1074,12 @@ function create_xml(nodes::Vector{Node}, walked_parts::WalkedParts, fname; distr
             push!(ways, Way(gid, part_nodes, walked_way.way.name, "walked", "yes", "yes", total_length(part_nodes)))
         end
     end
+    return ways
+end
+
+function create_xml(all_nodes::Vector{Node}, walked_parts::WalkedParts, fname; districts=Vector{District}(), district_levels=Dict{Symbol, Int}())
+    ways = get_ways_from_walked_parts(walked_parts)
+    gid = ways[end].id
     
     zoned_now = ZonedDateTime(now(), TimeZone("UTC"))
     xdoc = XMLDocument()
