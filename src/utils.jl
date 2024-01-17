@@ -445,17 +445,6 @@ function simplify(pointlist::Vector{GPSPoint}, detail=0.1)
 end
 
 """
-    pointlinedistance(p, a, b)
-
-Find the distance between a point `p` and a line between two points `a` and `b`.
-"""
-function pointlinedistance(p::LLA, a::LLA, b::LLA)
-    dx = euclidean_distance(LLA(mean_lat, a.lon), LLA(mean_lat, b.lon))
-    dy = euclidean_distance(LLA(a.lat, mean_lon), LLA(b.lat, mean_lon))
-    return abs(p.lon * dy - p.lat * dx + b.lon * a.lat - b.lat * a.lon) / hypot(dx, dy);
-end
-
-"""
     pointlinedistance(p::Point2, a::Point2, b::Point2)
 
 Find the distance between a point `p` and a line between two points `a` and `b`.

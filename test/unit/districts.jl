@@ -30,4 +30,13 @@ end
     district_percentages = EverySingleStreet.get_walked_district_perc(city_map, collect(values(nt.walked_parts.ways)))
     @test haskey(district_percentages, :Innenstadt)
     @test haskey(district_percentages, Symbol("Sankt Lorenz Süd"))
+
+    # centroid of filtered walked parts 
+    walked_parts = nt.walked_parts
+    way_ids = nt.walked_parts.names["Große Altefähre"]
+    ways = filter(p->first(p) in way_ids, walked_parts.ways)
+    walked_parts = EverySingleStreet.WalkedParts(walked_parts.names, ways)
+    centroid = EverySingleStreet.get_centroid(walked_parts)
+    dist = euclidean_distance(centroid, LLA(53.873281, 10.688440))
+    @test dist < 100
 end
