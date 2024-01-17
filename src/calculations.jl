@@ -283,6 +283,7 @@ function shortest_path_distance(from::Candidate, to::Candidate, city_map)
     # distance from end of from to begin of to
     len_way_from = total_length(from.way)
     sp = shortest_candidate_path(from, to, city_map)
+    isnothing(sp) && return Inf
     sp_from_e_to_b = total_length(city_map, sp)
 
     return  len_way_from - from.λ + sp_from_e_to_b + to.λ
@@ -577,13 +578,21 @@ function calculate_streetpath(name, subpath_id, candidates, city_map)
             end
         else
             sp = shortest_candidate_path(current_candidate, next_candidate, city_map)
+            if isnothing(sp)
+                if !isempty(segments)
+                    push!(streetpaths, StreetPath(name, subpath_id, segments))
+                    subpath_id += 1
+                    segments = Vector{StreetSegment}()
+                end
+                continue
+            end
             partial_segments = get_segments(city_map, current_candidate, next_candidate, sp)
             len_shortest_path =  total_length(city_map, sp)u"m"
             start_time = current_candidate.measured_point.time
             finish_time = next_candidate.measured_point.time
             duration = Quantity(finish_time - start_time)
             speed = uconvert(u"km/hr", len_shortest_path/duration)
-            if speed > 20u"km/hr"
+            if speed > 20u"km/hr" && !isempty(segments)
                 push!(streetpaths, StreetPath(name, subpath_id, segments))
                 subpath_id += 1
                 segments = Vector{StreetSegment}()

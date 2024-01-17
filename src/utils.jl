@@ -125,7 +125,7 @@ Return a [`Map`](@ref) object from the given json file path that was created usi
 function parse_map(fpath, geojson_path=nothing)
     json, no_graph_map = parse_no_graph_map(fpath, geojson_path)
     json_string = convert_keys_recursive(json)
-    graph = graph_from_object(json_string; weight_type=:distance, network_type=:all)
+    graph = graph_from_object(json_string; weight_type=:distance, network_type=:all, largest_connected_component=false)
     bounded_shortest_paths = bounded_all_shortest_paths(graph, 0.25, no_graph_map.osm_id_to_node_id, no_graph_map.walkable_road_nodes)
     return Map(no_graph_map, graph, bounded_shortest_paths)
 end

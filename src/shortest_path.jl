@@ -91,6 +91,8 @@ function get_shortest_path(city_map::Map, sp_from_id, sp_to_id)
     graph_to_id = osmgraph.node_to_index[sp_to_id]
     
     edges = get_shortest_path(city_map.bounded_shortest_paths, graph_from_id, graph_to_id)
+    # if there is no path at all
+    isempty(edges) && return nothing
     osm_vertices = Vector{Int}()
     for e in edges
         push!(osm_vertices, osmgraph.index_to_node[src(e)])
