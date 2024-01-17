@@ -56,4 +56,40 @@ end
     rm("tmp_local_map.json")
 end
 
+@testset "Disconnected" begin 
+    path = joinpath(@__DIR__, "..", "data", "Luebeck.json");
+    EverySingleStreet.download("Lübeck, Germany", path);
+    EverySingleStreet.filter_walkable_json!(path);
+    _, city_map = EverySingleStreet.parse_no_graph_map(path, joinpath(@__DIR__, "..", "data", "luebeck_districts.geojson"));
+
+    walked_parts = EverySingleStreet.WalkedParts(Dict{String, Vector{Int}}(), Dict{Int, EverySingleStreet.WalkedWay}())
+    gps_points = EverySingleStreet.get_gps_points(joinpath(@__DIR__, "..", "data", "strava_luebeck.json"))
+    gps_points = vcat(gps_points[1250:1280], gps_points[9680:9780])
+
+    nt = EverySingleStreet.map_matching(gps_points, city_map, walked_parts, "tmp_local_map.json");
+    rm("tmp_local_map.json")
+
+    # Check that both parts exists even though there is no connection between them in the local map
+    way_ids = nt.walked_parts.names["Große Altefähre"]
+    ways = filter(p->first(p) in way_ids, walked_parts.ways)
+    len = 0.0
+    for (idx,way) in ways 
+        for part in way.parts
+            len += part[2]-part[1]
+        end
+    end
+    @test len > 5
+
+    way_ids = nt.walked_parts.names["Rehderbrücke"]
+    ways = filter(p->first(p) in way_ids, walked_parts.ways)
+    len = 0.0
+    for (idx,way) in ways 
+        for part in way.parts
+            len += part[2]-part[1]
+        end
+    end
+    @test len > 5
+
+end
+
 end

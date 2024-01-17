@@ -429,7 +429,7 @@ function get_local_map(city_map, gps_points, map_local_path, padding=200)
         push!(node_transformed_points, transformed_point)
     end
     _, dists = nn(kd_tree, node_transformed_points)
-    node_ids = findall(<=(500), dists)
+    node_ids = findall(<=(padding), dists)
     create_local_json(city_map, node_ids, map_local_path)
 
     return parse_map(map_local_path)
@@ -438,6 +438,13 @@ end
 function map_matching(fpath, city_map::AbstractSimpleMap, walked_parts::WalkedParts, map_local_path="tmp_local_map.json")
     name = basename(fpath)
     gps_points = get_gps_points(fpath)
+    return map_matching(gps_points, city_map, walked_parts, map_local_path; name)
+end
+
+function map_matching(gps_points::Vector{GPSPoint}, city_map::AbstractSimpleMap, walked_parts::WalkedParts, map_local_path="tmp_local_map.json"; name=nothing)
+    if isnothing(name)
+        name = Dates.format(now(), "yyyy-mm-dd_HH:MM:SS")
+    end
     map_local = get_local_map(city_map, gps_points, map_local_path)
     if isempty(map_local.ways)
         return (walked_parts = walked_parts, added_kms = 0.0, this_walked_road_km = 0.0)     
