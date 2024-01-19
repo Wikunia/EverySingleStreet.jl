@@ -455,6 +455,10 @@ function pointlinedistance(p::Point2, a::Point2, b::Point2)
   return abs(p[1] * dy - p[2] * dx + b[1] * a[2] - b[2] * a[1]) / hypot(dx, dy);
 end
 
-function set_preferences(pairs...)
+function set_preferences!(pairs...)
     @set_preferences!(pairs...)
+end
+
+function get_preference(key)
+    return @load_preference(key, DEFAULT_PREFERNECE_VALUE[key])
 end

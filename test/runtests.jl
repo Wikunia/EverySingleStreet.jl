@@ -6,7 +6,6 @@ using Geodesy
 using TimeZones
 
 @testset "EverySingleStreet.jl" begin
-    include("unit/utils.jl")
     include("unit/download.jl")
     include("unit/gpx.jl")
     include("unit/candidates.jl")

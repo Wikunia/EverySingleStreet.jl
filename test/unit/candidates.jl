@@ -18,9 +18,22 @@
     end
 
     # check that lla of the candidate is less than 100m away from the initial point p
+    max_dist = 0.0
     for candidate in candidates
-        @test euclidean_distance(p.pos, candidate.lla) < 100
+        dist = euclidean_distance(p.pos, candidate.lla)
+        max_dist = max(max_dist, dist)
+        @test dist < 100
     end
+    max_dist *= 0.75
+    prev_max = EverySingleStreet.get_preference("CANDIDATES_MAXIMUM_DISTANCE")
+    EverySingleStreet.set_preferences!("CANDIDATES_MAXIMUM_DISTANCE" => max_dist)
+    candidates = EverySingleStreet.get_candidates(city_map, [p])[1]
+    for candidate in candidates
+        dist = euclidean_distance(p.pos, candidate.lla)
+        @test dist < max_dist
+    end
+    # set back
+    EverySingleStreet.set_preferences!("CANDIDATES_MAXIMUM_DISTANCE" => prev_max)
 end
 
 end

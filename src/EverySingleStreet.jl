@@ -27,10 +27,12 @@ using Statistics
 using TimeZones
 using Unitful
 
-const CANDIDATES_MAXIMUM_DISTANCE = @load_preference("CANDIDATES_MAXIMUM_DISTANCE", 50)
-const CANDIDATES_FILTER_DISTANCE = @load_preference("CANDIDATES_FILTER_DISTANCE", 25)
-const GPS_STD_DEV = @load_preference("GPS_STD_DEV", 15)
-const LOCAL_MAP_PADDING = @load_preference("LOCAL_MAP_PADDING", 200)
+const DEFAULT_PREFERNECE_VALUE = Dict(
+    "CANDIDATES_MAXIMUM_DISTANCE" => 50,
+    "CANDIDATES_FILTER_DISTANCE" => 25,
+    "GPS_STD_DEV" => 10,
+    "LOCAL_MAP_PADDING" => 200
+)
 
 include("gpx.jl")
 include("types.jl")
