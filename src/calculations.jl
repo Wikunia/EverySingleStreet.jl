@@ -105,12 +105,13 @@ function get_candidate_on_way(city_map, p, way::Way, trans, rev_trans; rev=false
 end
 
 """
-    get_matching_candidates(city_map, way_ids, p, origin_lla; maximum_dist=30)
+    get_matching_candidates(city_map, way_ids, p, origin_lla)
 
 Get matching candidates for a given point p and a list of possible way ids.
 Only return candidates which have a maximum_dist (in m) to the way.
 """
-function get_matching_candidates(city_map, way_ids, p, origin_lla; maximum_dist=30)
+function get_matching_candidates(city_map, way_ids, p, origin_lla)
+    maximum_dist = get_preference("CANDIDATES_MAXIMUM_DISTANCE")
     trans = ENUfromLLA(origin_lla, wgs84)
     rev_trans = LLAfromENU(origin_lla, wgs84)
 
@@ -159,12 +160,13 @@ function get_way_kdtree(city_map)
 end
 
 """
-    filter_candidates!(candidates; closer_dist=25)
+    filter_candidates!(candidates)
 
 Filter out candidates which are further away than `closer_dist` if there is at least candidate which is closer than `closer_dist`.
 """
-function filter_candidates!(candidates; closer_dist=25)
+function filter_candidates!(candidates)
     isempty(candidates) && return candidates
+    closer_dist = get_preference("CANDIDATES_FILTER_DISTANCE")
     # if there are candidates which are closer than closer_dist (in m) drop all further away
     min_dist = minimum(c.dist for c in candidates)
     if min_dist > closer_dist
@@ -182,6 +184,7 @@ function get_candidates(city_map, path)
     origin_lla = get_centroid(city_map.nodes)
     trans = ENUfromLLA(origin_lla, wgs84)
     id_to_way_id, way_tree, radius = get_way_kdtree(city_map)
+    radius += get_preference("CANDIDATES_MAXIMUM_DISTANCE")
 
     kps = zeros(2, )
     np = length(path)
@@ -207,12 +210,13 @@ function get_candidates(city_map, path)
 end
 
 """
-    get_candidate_probability(candidate::Candidate; sigma=10)
+    get_candidate_probability(candidate::Candidate)
 
 Return the emission probability of the given candidate and the standard deviation of the gps error.
 """
-function get_candidate_probability(candidate::Candidate; sigma=10)
+function get_candidate_probability(candidate::Candidate)
     dist = candidate.dist
+    sigma = get_preference("GPS_STD_DEV")
     return 1/(sqrt(2π)*sigma)*exp((-dist^2)/(2*sigma^2))
 end
 
@@ -305,35 +309,6 @@ function transition_probability(from::Candidate, to::Candidate, city_map)
 end
 
 """
-    filter_path(gps_points, dist)
-
-Return a new path for which the minimum distance between two consecutive points is at least `dist`.
-"""
-function filter_path(gps_points, dist)
-    new_gps_points = [gps_points[1]]
-    for i in 2:length(gps_points)-1
-        if euclidean_distance(new_gps_points[end].pos, gps_points[i].pos) > dist
-            push!(new_gps_points, gps_points[i])
-        end
-    end
-    push!(new_gps_points, gps_points[end])
-    saved_perc = 100*(1-(length(new_gps_points)/length(gps_points)))
-    return new_gps_points
-end
-
-function filter_path(gps_points::Vector{GPX.GPXPoint}, dist)
-    new_gps_points = [gps_points[1]]
-    for i in 2:length(gps_points)-1
-        if euclidean_distance(LLA(new_gps_points[end].lat, new_gps_points[end].lon), LLA(gps_points[i].lat, gps_points[i].lon)) > dist
-            push!(new_gps_points, gps_points[i])
-        end
-    end
-    push!(new_gps_points, gps_points[end])
-    saved_perc = 100*(1-(length(new_gps_points)/length(gps_points)))
-    return new_gps_points
-end
-
-"""
     get_candidates_from_idx(vec_candidates, candidate_idxs)
 
 Return candidates from an nested vector of candiates like `[[c1,c2],[c3]]` and candiate_idxs which are 1d like `[1,3]` would return
@@ -412,7 +387,8 @@ function create_local_json(city_map, node_ids_start, fpath)
     end
 end
 
-function get_local_map(city_map, gps_points, map_local_path, padding=200)
+function get_local_map(city_map, gps_points, map_local_path)
+    padding=get_preference("LOCAL_MAP_PADDING")
     # build kd tree with gps points 
     origin_lla = get_centroid(city_map.nodes)
     trans = ENUfromLLA(origin_lla, wgs84)

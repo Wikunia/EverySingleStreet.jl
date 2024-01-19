@@ -4,3 +4,4 @@ docs/build
 .github
 test/data/CLZ.json
 test/data/Luebeck.json
+LocalPreferences.toml

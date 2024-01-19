@@ -165,7 +165,7 @@ function combine_gpx_tracks(folder)
         @assert length(gpxFile.tracks) == 1
         @assert length(gpxFile.tracks[1].segments) == 1
     
-        points = filter_path(gpxFile.tracks[1].segments[1].points, 25)
+        points = simplify(gpxFile.tracks[1].segments[1].points, 5)
         for p in points
             point = GPX.GPXPoint(p.lat, p.lon, p.ele, p.time, p.desc)
             push!(track_segment, point)
@@ -453,4 +453,12 @@ function pointlinedistance(p::Point2, a::Point2, b::Point2)
   dx = b[1] - a[1]
   dy = b[2] - a[2]
   return abs(p[1] * dy - p[2] * dx + b[1] * a[2] - b[2] * a[1]) / hypot(dx, dy);
+end
+
+function set_preferences!(pairs...)
+    @set_preferences!(pairs...)
+end
+
+function get_preference(key)
+    return @load_preference(key, DEFAULT_PREFERNECE_VALUE[key])
 end
