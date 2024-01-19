@@ -5,6 +5,7 @@ using DataFrames
 using DataStructures
 using Dates
 using Distributions
+using DotEnv
 using FileIO
 using Geodesy
 using GeoJSON
@@ -25,6 +26,10 @@ using StaticGraphs
 using Statistics
 using TimeZones
 using Unitful
+
+DotEnv.config()
+DEFAULT_CONFIG = DotEnv.config(joinpath(@__DIR__, ".env")).dict
+CONFIG         = merge(DEFAULT_CONFIG, ENV)
 
 include("gpx.jl")
 include("types.jl")

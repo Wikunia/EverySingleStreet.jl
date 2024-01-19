@@ -165,7 +165,7 @@ function combine_gpx_tracks(folder)
         @assert length(gpxFile.tracks) == 1
         @assert length(gpxFile.tracks[1].segments) == 1
     
-        points = filter_path(gpxFile.tracks[1].segments[1].points, 25)
+        points = simplify(gpxFile.tracks[1].segments[1].points, 5)
         for p in points
             point = GPX.GPXPoint(p.lat, p.lon, p.ele, p.time, p.desc)
             push!(track_segment, point)
