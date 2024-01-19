@@ -96,3 +96,5 @@ struct WalkedParts
     names::Dict{String, Vector{Int}} 
     ways::Dict{Int, WalkedWay}
 end
+
+WalkedParts() = WalkedParts(Dict{String, Vector{Int}}(), Dict{Int, WalkedWay}())
