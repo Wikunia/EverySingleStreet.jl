@@ -19,12 +19,20 @@ using LinearAlgebra
 using NearestNeighbors
 using OrderedCollections
 using PolygonInbounds
+using Preferences
 using ProgressMeter
 using SparseArrays
 using StaticGraphs
 using Statistics
 using TimeZones
 using Unitful
+
+const DEFAULT_PREFERNECE_VALUE = Dict(
+    "CANDIDATES_MAXIMUM_DISTANCE" => 50,
+    "CANDIDATES_FILTER_DISTANCE" => 25,
+    "GPS_STD_DEV" => 10,
+    "LOCAL_MAP_PADDING" => 200
+)
 
 include("gpx.jl")
 include("types.jl")
