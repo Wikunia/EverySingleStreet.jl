@@ -5,7 +5,6 @@ using DataFrames
 using DataStructures
 using Dates
 using Distributions
-using DotEnv
 using FileIO
 using Geodesy
 using GeoJSON
@@ -20,6 +19,7 @@ using LinearAlgebra
 using NearestNeighbors
 using OrderedCollections
 using PolygonInbounds
+using Preferences
 using ProgressMeter
 using SparseArrays
 using StaticGraphs
@@ -27,9 +27,10 @@ using Statistics
 using TimeZones
 using Unitful
 
-DotEnv.config()
-DEFAULT_CONFIG = DotEnv.config(joinpath(@__DIR__, ".env")).dict
-CONFIG         = merge(DEFAULT_CONFIG, ENV)
+const CANDIDATES_MAXIMUM_DISTANCE = @load_preference("CANDIDATES_MAXIMUM_DISTANCE", 50)
+const CANDIDATES_FILTER_DISTANCE = @load_preference("CANDIDATES_FILTER_DISTANCE", 25)
+const GPS_STD_DEV = @load_preference("GPS_STD_DEV", 15)
+const LOCAL_MAP_PADDING = @load_preference("LOCAL_MAP_PADDING", 200)
 
 include("gpx.jl")
 include("types.jl")

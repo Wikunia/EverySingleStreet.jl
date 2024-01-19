@@ -105,12 +105,12 @@ function get_candidate_on_way(city_map, p, way::Way, trans, rev_trans; rev=false
 end
 
 """
-    get_matching_candidates(city_map, way_ids, p, origin_lla; maximum_dist=parse(Float64, CONFIG["CANDIDATES_MAXIMUM_DISTANCE"]))
+    get_matching_candidates(city_map, way_ids, p, origin_lla; maximum_dist=CANDIDATES_MAXIMUM_DISTANCE)
 
 Get matching candidates for a given point p and a list of possible way ids.
 Only return candidates which have a maximum_dist (in m) to the way. (defined in the config as `CANDIDATES_MAXIMUM_DISTANCE`)
 """
-function get_matching_candidates(city_map, way_ids, p, origin_lla; maximum_dist=parse(Float64, CONFIG["CANDIDATES_MAXIMUM_DISTANCE"]))
+function get_matching_candidates(city_map, way_ids, p, origin_lla; maximum_dist=CANDIDATES_MAXIMUM_DISTANCE)
     trans = ENUfromLLA(origin_lla, wgs84)
     rev_trans = LLAfromENU(origin_lla, wgs84)
 
@@ -159,11 +159,11 @@ function get_way_kdtree(city_map)
 end
 
 """
-    filter_candidates!(candidates; closer_dist=parse(Float64, CONFIG["CANDIDATES_FILTER_DISTANCE"]))
+    filter_candidates!(candidates; closer_dist=CANDIDATES_FILTER_DISTANCE)
 
 Filter out candidates which are further away than `closer_dist` if there is at least candidate which is closer than `closer_dist`.
 """
-function filter_candidates!(candidates; closer_dist=parse(Float64, CONFIG["CANDIDATES_FILTER_DISTANCE"]))
+function filter_candidates!(candidates; closer_dist=CANDIDATES_FILTER_DISTANCE)
     isempty(candidates) && return candidates
     # if there are candidates which are closer than closer_dist (in m) drop all further away
     min_dist = minimum(c.dist for c in candidates)
@@ -207,11 +207,11 @@ function get_candidates(city_map, path)
 end
 
 """
-    get_candidate_probability(candidate::Candidate; sigma=parse(Float64, CONFIG["GPS_STD_DEV"]))
+    get_candidate_probability(candidate::Candidate; sigma=GPS_STD_DEV)
 
 Return the emission probability of the given candidate and the standard deviation of the gps error.
 """
-function get_candidate_probability(candidate::Candidate; sigma=parse(Float64, CONFIG["GPS_STD_DEV"]))
+function get_candidate_probability(candidate::Candidate; sigma=GPS_STD_DEV)
     dist = candidate.dist
     return 1/(sqrt(2π)*sigma)*exp((-dist^2)/(2*sigma^2))
 end
@@ -383,7 +383,7 @@ function create_local_json(city_map, node_ids_start, fpath)
     end
 end
 
-function get_local_map(city_map, gps_points, map_local_path, padding=parse(Float64, CONFIG["LOCAL_MAP_PADDING"]))
+function get_local_map(city_map, gps_points, map_local_path, padding=LOCAL_MAP_PADDING)
     # build kd tree with gps points 
     origin_lla = get_centroid(city_map.nodes)
     trans = ENUfromLLA(origin_lla, wgs84)
