@@ -16,6 +16,8 @@ using JSON3
 using LightOSM
 using LightXML: XMLDocument, save_file, create_root, new_child, add_text, set_attribute, set_attributes
 using LinearAlgebra
+import Luxor
+import Luxor: @png, @svg
 using NearestNeighbors
 using OrderedCollections
 using PolygonInbounds
@@ -40,5 +42,6 @@ include("utils.jl")
 include("calculations.jl")
 include("shortest_path.jl")
 include("districts.jl")
+include("drawing.jl")
 
 end
