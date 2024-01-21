@@ -92,4 +92,21 @@ end
 
 end
 
+@testset "Altona walk" begin 
+    _, altona_map = EverySingleStreet.parse_no_graph_map(joinpath(@__DIR__, "..", "data", "Altona.json"));
+    altona_walk_path = joinpath(@__DIR__, "..", "data", "altona_walk.json");
+    walked_parts = EverySingleStreet.WalkedParts(Dict{String, Vector{Int}}(), Dict{Int, EverySingleStreet.WalkedWay}());
+    mm_data = EverySingleStreet.map_matching(altona_walk_path, altona_map, walked_parts, "tmp_local_map.json");
+    rm("tmp_local_map.json")
+    walked_parts = mm_data.walked_parts
+    # Schillerstraße completely walked
+    walked_way = walked_parts.ways[112450623]
+    total_street_len = walked_way.way.meters
+    walked_meters = sum(p[2]-p[1] for p in walked_way.parts)
+    @test total_street_len ≈ walked_meters
+
+    # Part in park is walked but should appear as it isn't a street
+    @test !haskey(walked_parts.ways, 135511621)
+end
+
 end

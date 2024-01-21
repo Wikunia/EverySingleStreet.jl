@@ -750,7 +750,12 @@ function total_length(parts::WalkedParts; filter_fct=(way)->true)
 end
 
 
+"""
+    calculate_walked_parts(streetpaths::Vector{StreetPath}, city_ways::Vector{Way}, walked_ways=Dict{Int, WalkedWay}())
 
+Return `WalkedParts` given the streetpath segments and the possible ways of the city.
+Can be added to already existing `walked_ways`. Filters everything which isn't a `walkable_road` inside `city_ways`.    
+"""
 function calculate_walked_parts(streetpaths::Vector{StreetPath}, city_ways::Vector{Way}, walked_ways=Dict{Int, WalkedWay}())
     names = Dict{String, Vector{Int}}()
     for way in city_ways
@@ -760,7 +765,7 @@ function calculate_walked_parts(streetpaths::Vector{StreetPath}, city_ways::Vect
             names[way.name] = [way.id]
         end
     end
-    possible_way_ids = Set(way.id for way in city_ways)
+    possible_way_ids = Set(way.id for way in city_ways if iswalkable_road(way))
 
     for streetpath in streetpaths
         for segment in streetpath.segments
