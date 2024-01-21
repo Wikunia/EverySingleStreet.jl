@@ -79,6 +79,11 @@ They are both on the same way and have the same direction.
 struct StreetSegment
     from::Candidate
     to::Candidate
+    function StreetSegment(from, to)
+        @assert from.way.id == to.way.id
+        @assert from.way_is_reverse == to.way_is_reverse
+        new(from, to)
+    end
 end
 
 struct StreetPath

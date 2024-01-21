@@ -258,13 +258,24 @@ end
 Return the shortest path as node ids from one candidate to another given a city map.
 """
 function shortest_candidate_path(from::Candidate, to::Candidate, city_map)
-    sp_from_id = get_next_node_id(from)
-    sp_to_id = get_prev_node_id(to)
-    if sp_from_id == sp_to_id
-        return [sp_from_id, sp_to_id]
+    from_ids = (get_prev_node_id(from), get_next_node_id(from))
+    to_ids = (get_prev_node_id(to), get_next_node_id(to))
+    shortest_dist = Inf
+    shortest_sp = nothing
+    for sp_from_id in from_ids
+        for sp_to_id in to_ids
+            sp = get_shortest_path(city_map, sp_from_id, sp_to_id)
+            isnothing(sp) && continue
+            dist = total_length(city_map, sp)
+            dist += euclidean_distance(from.lla, get_lla(city_map, sp[1]))
+            dist += euclidean_distance(get_lla(city_map, sp[end]), to.lla)
+            if dist < shortest_dist 
+                shortest_dist = dist
+                shortest_sp = sp
+            end
+        end
     end
-    sp = get_shortest_path(city_map, sp_from_id, sp_to_id)
-    return sp
+    return shortest_sp
 end
 
 """
@@ -374,6 +385,7 @@ function create_local_json(city_map, node_ids_start, fpath)
         element[:type] = "way"
         element[:nodes] = [node.id for node in way.nodes]
         element[:tags] = Dict{Symbol, String}()
+        element[:tags][:name] = way.name
         element[:tags][:highway] = way.highway
         element[:tags][:foot] = way.foot
         element[:tags][:access] = way.access
@@ -604,22 +616,21 @@ function get_segments(city_map, current_candidate, next_candidate, sp)
 
     segments = Vector{StreetSegment}()
     if length(sp) == 2 && sp[1] == sp[2]
-        nodeid = get_next_node_id(current_candidate)
+        nodeid = sp[1]
         node = get_node(city_map, nodeid)
         gps_point = GPSPoint(LLA(node.lat, node.lon), current_candidate.measured_point.time)
         c1 = get_candidate_on_way(city_map, gps_point, current_candidate.way, trans, rev_trans; rev=current_candidate.way_is_reverse)
         push!(segments, StreetSegment(current_candidate, c1))
-        nodeid = get_prev_node_id(next_candidate)
         node = get_node(city_map, nodeid)
         gps_point = GPSPoint(LLA(node.lat, node.lon), current_candidate.measured_point.time)
-        c2 = get_candidate_on_way(city_map, gps_point, next_candidate.way, trans, rev_trans; rev=current_candidate.way_is_reverse)
+        c2 = get_candidate_on_way(city_map, gps_point, next_candidate.way, trans, rev_trans; rev=next_candidate.way_is_reverse)
         push!(segments, StreetSegment(c2, next_candidate))
         return segments
     end
 
 
     way_segments = get_way_segments(sp, city_map)
-    nodeid = get_next_node_id(current_candidate)
+    nodeid = sp[1]
     node = get_node(city_map, nodeid)
     gps_point = GPSPoint(LLA(node.lat, node.lon), current_candidate.measured_point.time)
     c1 = get_candidate_on_way(city_map, gps_point, current_candidate.way, trans, rev_trans; rev=current_candidate.way_is_reverse)
@@ -638,7 +649,7 @@ function get_segments(city_map, current_candidate, next_candidate, sp)
         push!(segments, StreetSegment(c1, c2))
     end
 
-    nodeid = get_prev_node_id(next_candidate)
+    nodeid = sp[end]
     node = get_node(city_map, nodeid)
     gps_point = GPSPoint(LLA(node.lat, node.lon), current_candidate.measured_point.time)
     c2 = get_candidate_on_way(city_map, gps_point, next_candidate.way, trans, rev_trans; rev=next_candidate.way_is_reverse)
@@ -749,7 +760,12 @@ function total_length(parts::WalkedParts; filter_fct=(way)->true)
 end
 
 
+"""
+    calculate_walked_parts(streetpaths::Vector{StreetPath}, city_ways::Vector{Way}, walked_ways=Dict{Int, WalkedWay}())
 
+Return `WalkedParts` given the streetpath segments and the possible ways of the city.
+Can be added to already existing `walked_ways`. Filters everything which isn't a `walkable_road` inside `city_ways`.    
+"""
 function calculate_walked_parts(streetpaths::Vector{StreetPath}, city_ways::Vector{Way}, walked_ways=Dict{Int, WalkedWay}())
     names = Dict{String, Vector{Int}}()
     for way in city_ways
@@ -759,7 +775,7 @@ function calculate_walked_parts(streetpaths::Vector{StreetPath}, city_ways::Vect
             names[way.name] = [way.id]
         end
     end
-    possible_way_ids = Set(way.id for way in city_ways)
+    possible_way_ids = Set(way.id for way in city_ways if iswalkable_road(way))
 
     for streetpath in streetpaths
         for segment in streetpath.segments
@@ -1040,6 +1056,11 @@ function get_gps_point(nodes, λ, trans, rev_trans)
     p_on_ab = get_lla(get_interpolation_point(w1p, w2p, t), rev_trans)
 
     return p_on_ab
+end
+
+function get_lla(city_map::AbstractSimpleMap, osm_node_id::Int)
+    node = city_map.nodes[city_map.osm_id_to_node_id[osm_node_id]]
+    return LLA(node.lat, node.lon)
 end
 
 function get_ways_from_walked_parts(walked_parts::WalkedParts)
