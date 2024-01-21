@@ -374,6 +374,7 @@ function create_local_json(city_map, node_ids_start, fpath)
         element[:type] = "way"
         element[:nodes] = [node.id for node in way.nodes]
         element[:tags] = Dict{Symbol, String}()
+        element[:tags][:name] = way.name
         element[:tags][:highway] = way.highway
         element[:tags][:foot] = way.foot
         element[:tags][:access] = way.access
@@ -612,7 +613,7 @@ function get_segments(city_map, current_candidate, next_candidate, sp)
         nodeid = get_prev_node_id(next_candidate)
         node = get_node(city_map, nodeid)
         gps_point = GPSPoint(LLA(node.lat, node.lon), current_candidate.measured_point.time)
-        c2 = get_candidate_on_way(city_map, gps_point, next_candidate.way, trans, rev_trans; rev=current_candidate.way_is_reverse)
+        c2 = get_candidate_on_way(city_map, gps_point, next_candidate.way, trans, rev_trans; rev=next_candidate.way_is_reverse)
         push!(segments, StreetSegment(c2, next_candidate))
         return segments
     end
