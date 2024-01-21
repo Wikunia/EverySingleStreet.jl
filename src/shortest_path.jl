@@ -86,6 +86,9 @@ Return the shortest path from `from` to `to`. Has the same output as `shortest_p
 but uses the `BoundedAllShortestPaths` cache when it exists.
 """
 function get_shortest_path(city_map::Map, sp_from_id, sp_to_id)
+    if sp_from_id == sp_to_id
+        return [sp_from_id, sp_to_id]
+    end
     osmgraph = city_map.graph
     graph_from_id = osmgraph.node_to_index[sp_from_id]
     graph_to_id = osmgraph.node_to_index[sp_to_id]
