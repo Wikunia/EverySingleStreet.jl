@@ -5,3 +5,4 @@ docs/build
 test/data/CLZ.json
 test/data/Luebeck.json
 LocalPreferences.toml
+.vscode
