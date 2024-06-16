@@ -1,8 +1,8 @@
 test/current
 Manifest.toml
 docs/build
-.github
 test/data/CLZ.json
 test/data/Luebeck.json
+test/data/test_download.json
 LocalPreferences.toml
 .vscode
