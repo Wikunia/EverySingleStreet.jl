@@ -19,7 +19,9 @@ end
 Get a LLA formatted position from a point and a Geodesy transformation.
 """
 function get_lla(p, trans)
-    return trans(ENU(p...))
+    lla = trans(ENU(p...))
+    # avoid weird altitude value
+    return LLA(lla.lat, lla.lon)
 end
 
 """

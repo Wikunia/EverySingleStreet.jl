@@ -13,6 +13,13 @@
     ]
     times = [now()+i*Second(30) for i in 1:length(path)]
     points = [EverySingleStreet.GPSPoint(p, ZonedDateTime(time, TimeZone("UTC"))) for (p, time) in zip(path, times)]
+
+    bbox = EverySingleStreet.bbox(points)
+    @test bbox.south_west.lat ≈ 51.80400106293405
+    @test bbox.south_west.lon ≈ 10.334263247682527
+    @test bbox.north_east.lat ≈ 51.80665409406621
+    @test bbox.north_east.lon ≈ 10.335425
+     
     gpxfile = EverySingleStreet.GPXFile("test", points)
     candidates = EverySingleStreet.map_path(city_map, gpxfile)
     @test length(candidates) == 1
