@@ -26,7 +26,7 @@ their documentation should be checked.
 
 # Fields
 - `id::Int`: Unique identifier for the way.
-- `nodes::Vector{Node}`: A vector of `Node` objects defining the way.
+- `nodes::Vector{Node}`: A vector of [`Node`](@ref) objects defining the way.
 - `name::String`: Name of the way (e.g., street name).
 - `highway` (String): Highway type of the way (e.g., "motorway", "residential").
 - `foot` (String): Access for pedestrians (e.g., "yes", "no").
@@ -64,7 +64,7 @@ Represents a district within the city.
 
 # Fields
 - `name::Symbol`: Symbolic name of the district.
-- `polygons::Vector{HolePolygon}`: A vector of `HolePolygon` objects defining the geographical area of the district.
+- `polygons::Vector{HolePolygon}`: A vector of [`HolePolygon`](@ref) objects defining the geographical area of the district.
 """
 struct District
     name::Symbol
@@ -183,7 +183,7 @@ Represents a GPX file containing a collection of GPS points.
 
 Fields:
   - `name::String`: The name of the GPX file.
-  - `gps_points::Vector{GPSPoint}`: A vector of `GPSPoint` objects representing the GPS points stored in the file.
+  - `gps_points::Vector{GPSPoint}`: A vector of [`GPSPoint`](@ref) objects representing the GPS points stored in the file.
 """
 struct GPXFile
     name::String 
@@ -197,8 +197,8 @@ A street segment contains of two candidates which have the following property:
 They are both on the same way and have the same direction.
 
 # Fields
-- `from::Candidate` the start candidate of the segment.
-- `to::Candidate` the start candidate of the segment.
+- `from::Candidate` the start [`Candidate`](@ref) of the segment.
+- `to::Candidate` the start [`Candidate`](@ref) of the segment.
 """
 struct StreetSegment
     from::Candidate
@@ -218,7 +218,7 @@ Represents a path through the street network defined by a sequence of connected 
 # Fields
   - `name::String`: A name for the path (e.g., user-defined name).
   - `subpath_id::Int`: Unique identifier for the path within a larger context (e.g., route).
-  - `segments::Vector{StreetSegment}`: A vector of `StreetSegment` objects representing the connected street segments forming the path.
+  - `segments::Vector{StreetSegment}`: A vector of [`StreetSegment`](@ref) objects representing the connected street segments forming the path.
 """
 struct StreetPath
     name::String
@@ -232,7 +232,7 @@ end
 Represents a way (street) segment that has been walked along, potentially with additional information about the walked parts.
 
 Fields
-  - `way::Way`: The `Way` object representing the underlying street segment.
+  - `way::Way`: The [`Way`](@ref) object representing the underlying street segment.
   - `parts::Vector{Tuple{Float64, Float64}}`: A vector of tuples where each tuple represents a portion of the way that was walked (start and end distance along the way in meters).
 """
 mutable struct WalkedWay
@@ -246,8 +246,8 @@ end
 Represents a collection of walked way segments for a specific area, potentially with additional information for each way.
 
 Fields:
-  - `names::Dict{String, Vector{Int}}`: A dictionary where keys are way names (from `Way.name`) and values are vectors of integers referencing corresponding `WalkedWay` objects in the `ways` field.
-  - `ways::Dict{Int, WalkedWay}`: A dictionary where keys are unique identifiers and values are `WalkedWay` objects representing the walked way segments.
+  - `names::Dict{String, Vector{Int}}`: A dictionary where keys are way names (from `Way.name`) and values are vectors of integers referencing corresponding [`WalkedWay`](@ref) objects in the `ways` field.
+  - `ways::Dict{Int, WalkedWay}`: A dictionary where keys are unique identifiers and values are [`WalkedWay`](@ref) objects representing the walked way segments.
 """
 struct WalkedParts
     names::Dict{String, Vector{Int}} 
