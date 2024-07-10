@@ -1,9 +1,9 @@
 test/current
 Manifest.toml
 docs/build
-.github
 test/data/CLZ.json
 test/data/Luebeck.json
 LocalPreferences.toml
 .DS_Store
-.vscode/
+test/data/test_download.json
+.vscode
