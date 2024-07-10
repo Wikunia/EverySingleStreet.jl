@@ -435,7 +435,7 @@ function map_matching(gps_points::Vector{GPSPoint}, city_map::AbstractSimpleMap,
     end
     map_local = get_local_map(city_map, gps_points, map_local_path)
     if isempty(map_local.ways)
-        return (walked_parts = walked_parts, added_kms = 0.0, this_walked_road_km = 0.0)     
+        return (this_walked_parts = WalkedParts(), walked_parts = walked_parts, added_kms = 0.0, this_walked_road_km = 0.0)     
     end
     streetpaths = map_matching(map_local, name, gps_points)
     prev_walked_road_km = total_length(walked_parts; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
