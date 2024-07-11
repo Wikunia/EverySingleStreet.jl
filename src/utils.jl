@@ -426,6 +426,7 @@ Simplify a polygon:
 `detail` is the maximum approximation error of simplified polygon.
 """
 function simplify(pointlist::Vector{GPSPoint}, detail=0.1)
+    isempty(pointlist) && return pointlist
     origin_lla = get_centroid(pointlist)
     trans = ENUfromLLA(origin_lla, wgs84)
     transformed_points = Vector{Point2{Float64}}()

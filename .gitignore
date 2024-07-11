@@ -3,6 +3,7 @@ Manifest.toml
 docs/build
 test/data/CLZ.json
 test/data/Luebeck.json
-test/data/test_download.json
 LocalPreferences.toml
+.DS_Store
+test/data/test_download.json
 .vscode

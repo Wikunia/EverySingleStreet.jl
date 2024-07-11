@@ -437,7 +437,7 @@ function map_matching(gps_points::Vector{GPSPoint}, city_map::AbstractSimpleMap,
     end
     map_local = get_local_map(city_map, gps_points, map_local_path)
     if isempty(map_local.ways)
-        return (walked_parts = walked_parts, added_kms = 0.0, this_walked_road_km = 0.0)     
+        return (this_walked_parts = WalkedParts(), walked_parts = walked_parts, added_kms = 0.0, this_walked_road_km = 0.0)     
     end
     streetpaths = map_matching(map_local, name, gps_points)
     prev_walked_road_km = total_length(walked_parts; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
@@ -445,7 +445,7 @@ function map_matching(gps_points::Vector{GPSPoint}, city_map::AbstractSimpleMap,
     walked_parts = calculate_walked_parts(streetpaths, city_map.ways, walked_parts.ways)
     now_walked_road_km = total_length(walked_parts; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
     this_walked_road_km = total_length(this_walked_parts; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
-    return (walked_parts = walked_parts, added_kms = now_walked_road_km - prev_walked_road_km, this_walked_road_km = this_walked_road_km)
+    return (walked_parts = walked_parts, this_walked_parts = this_walked_parts, added_kms = now_walked_road_km - prev_walked_road_km, this_walked_road_km = this_walked_road_km)
 end
 
 function map_matching(city_map, gpxfile::GPXFile)

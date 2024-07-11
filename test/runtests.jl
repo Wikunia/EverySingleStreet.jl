@@ -12,4 +12,5 @@ using TimeZones
     include("unit/map_path.jl")
     include("unit/shortest_path.jl")
     include("unit/districts.jl")
+    include("unit/drawing.jl")
 end
