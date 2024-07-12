@@ -21,11 +21,10 @@ This project provides tools for processing and analyzing street network data. It
 This project is made using the [Julia programming language](https://julialang.org). To install this package run:
 
 ```julia
-] add https://github.com/Wikunia/EverySingleStreet.jl
+] add EverySingleStreet
 
 using EverySingleStreet
 ```
-as it is currently not registered in the Julia registry.
 
 ## Rundown of the functionality
 
