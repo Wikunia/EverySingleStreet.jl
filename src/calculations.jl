@@ -1095,13 +1095,16 @@ end
 function create_xml(all_nodes::Vector{Node}, walked_parts::WalkedParts, fname; districts=Vector{District}(), district_levels=Dict{Symbol, Int}())
     ways = get_ways_from_walked_parts(walked_parts)
     gid = ways[end].id
+
+    minlat, maxlat = extrema(n.lat for n in all_nodes) 
+    minlon, maxlon = extrema(n.lon for n in all_nodes) 
     
     zoned_now = ZonedDateTime(now(), TimeZone("UTC"))
     xdoc = XMLDocument()
     xroot = create_root(xdoc, "osm")
     set_attributes(xroot, Dict("version"=>"0.6"))
     child = new_child(xroot, "bounds")
-    set_attributes(child, Dict("minlon" => "7.96783", "minlat" => "53.39183", "maxlon" => "10.33196", "maxlat" => "54.06261"))
+    set_attributes(child, Dict("minlon" => minlon, "minlat" => minlat, "maxlon" => maxlon, "maxlat" => maxlat))
 
     for way in ways
         for node in way.nodes
