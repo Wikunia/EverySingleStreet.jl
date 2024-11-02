@@ -761,14 +761,7 @@ function total_length(parts::WalkedParts; filter_fct=(way)->true)
     return dist
 end
 
-
-"""
-    calculate_walked_parts(streetpaths::Vector{StreetPath}, city_ways::Vector{Way}, walked_ways=Dict{Int, WalkedWay}())
-
-Return `WalkedParts` given the streetpath segments and the possible ways of the city.
-Can be added to already existing `walked_ways`. Filters everything which isn't a `walkable_road` inside `city_ways`.    
-"""
-function calculate_walked_parts(streetpaths::Vector{StreetPath}, city_ways::Vector{Way}, walked_ways=Dict{Int, WalkedWay}())
+function streetpaths_to_walked_parts(streetpaths::Vector{StreetPath}, city_ways::Vector{Way}, walked_ways=Dict{Int, WalkedWay}())
     names = Dict{String, Vector{Int}}()
     for way in city_ways
         if haskey(names, way.name)
@@ -796,8 +789,6 @@ function calculate_walked_parts(streetpaths::Vector{StreetPath}, city_ways::Vect
             if start_λ == finish_λ
                 continue
             end
-            start_λ = clamp(start_λ-5, 0, len_way)
-            finish_λ = clamp(finish_λ+5, 0, len_way)
             if !haskey(walked_ways, segment.from.way.id)
                 walked_ways[segment.from.way.id] = WalkedWay(segment.from.way, [(start_λ, finish_λ)])
             else
@@ -807,8 +798,49 @@ function calculate_walked_parts(streetpaths::Vector{StreetPath}, city_ways::Vect
             end
         end
     end
-
     return WalkedParts(names, walked_ways)
+end
+
+"""
+    calculate_walked_parts(streetpaths::Vector{StreetPath}, city_ways::Vector{Way}, walked_ways=Dict{Int, WalkedWay}())
+
+Return `WalkedParts` given the streetpath segments and the possible ways of the city.
+Can be added to already existing `walked_ways`. Filters everything which isn't a `walkable_road` inside `city_ways`.   
+Calls several function to get a better approximation of what was actually walked like 
+    - add extra buffer at start and end of streets to not miss the last few meters of a dead end street as an example [`extend_walked_parts!`](@ref)
+    - closes circles like roundabouts, parts at ends of some dead end streets
+"""
+function calculate_walked_parts(streetpaths::Vector{StreetPath}, city_ways::Vector{Way}, walked_ways=Dict{Int, WalkedWay}())
+    walked_parts = streetpaths_to_walked_parts(streetpaths, city_ways, walked_ways)
+    extend_walked_parts!(walked_parts)
+    return walked_parts
+end
+
+"""
+    extend_walked_parts!(walked_parts)
+
+Extend the walked parts by adding up to `EXTEND_WALKED_WAY_UP_TO` to the start and end of a walked way.
+"""
+function extend_walked_parts!(walked_parts)
+    extend_up_to = get_preference("EXTEND_WALKED_WAY_UP_TO")
+    for (idx, wway) in walked_parts.ways
+        len_way = total_length(wway.way)
+        new_parts = Vector{Tuple{Float64, Float64}}()
+        for part in wway.parts
+            s = part[1]
+            e = part[2]
+            if part[1] < extend_up_to
+                s = 0.0
+            end
+            if part[2] > len_way - extend_up_to
+                e = len_way
+            end
+            push!(new_parts, (s,e))
+        end
+        new_parts = merge_ranges(new_parts)
+        walked_parts.ways[idx].parts = new_parts
+    end
+    return walked_parts
 end
 
 function merge_ranges(ranges::Vector{Tuple{T, T}}) where T
