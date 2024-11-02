@@ -54,10 +54,25 @@ function point_linesegment_distance(p::Point2, a::Point2, b::Point2)
 	return norm(p_on_ab-p)
 end
 
+function get_candidate_on_way(idx::Int, way::Way; rev=false)
+    nodes = rev ? reverse(way.nodes) : way.nodes
+    node = nodes[idx]
+    lla = LLA(node.lat, node.lon)
+    gpspoint = GPSPoint(lla, ZonedDateTime(now(UTC), TimeZone("UTC")))
+    λ = 0.0
+    last_node = nodes[1]
+    @views for n in nodes[1:idx]
+        λ += euclidean_distance(LLA(last_node.lat, last_node.lon), LLA(n.lat, n.lon))
+        last_node = n
+    end
+    return Candidate(gpspoint, lla, way, rev, 0, λ)
+end
+
+
 function get_candidate_on_way(node::Node, way::Way; rev=false)
     nodes = rev ? reverse(way.nodes) : way.nodes
     lla = LLA(node.lat, node.lon)
-    gpspoint = GPSPoint(lla, ZonedDateTime(now(), TimeZone("UTC")))
+    gpspoint = GPSPoint(lla, ZonedDateTime(now(UTC), TimeZone("UTC")))
     λ = 0.0
     last_node = nodes[1]
     for n in nodes
@@ -816,12 +831,17 @@ function calculate_walked_parts(streetpaths::Vector{StreetPath}, city_ways::Vect
     return walked_parts
 end
 
+function extend_walked_parts!(walked_parts)
+    extend_walked_parts_simple!(walked_parts)
+    extend_walked_parts_cycle!(walked_parts)
+end
+
 """
-    extend_walked_parts!(walked_parts)
+    extend_walked_parts_simple!(walked_parts)
 
 Extend the walked parts by adding up to `EXTEND_WALKED_WAY_UP_TO` to the start and end of a walked way.
 """
-function extend_walked_parts!(walked_parts)
+function extend_walked_parts_simple!(walked_parts)
     extend_up_to = get_preference("EXTEND_WALKED_WAY_UP_TO")
     for (idx, wway) in walked_parts.ways
         len_way = total_length(wway.way)
@@ -836,6 +856,48 @@ function extend_walked_parts!(walked_parts)
                 e = len_way
             end
             push!(new_parts, (s,e))
+        end
+        new_parts = merge_ranges(new_parts)
+        walked_parts.ways[idx].parts = new_parts
+    end
+    return walked_parts
+end
+
+"""
+    extend_walked_parts_cycle!(walked_parts)
+
+Extend the walked parts by finishing a cycle if more than `MIN_FILL_CYCLE_PERC` perc of a cycle of length maximum `MAX_FILL_CYCLE_LENGTH` is walked.
+"""
+function extend_walked_parts_cycle!(walked_parts)
+    max_cycle_len = get_preference("MAX_FILL_CYCLE_LENGTH")
+    min_fill_perc = get_preference("MIN_FILL_CYCLE_PERC")
+    for (idx, wway) in walked_parts.ways
+        hascycle(wway.way) || continue
+        # get cycles as parts of way
+        way = wway.way 
+        g = get_directed_graph(way)
+        cycles = simplecycles(g)
+        cycles_λ = Vector{Tuple{Float64, Float64}}()
+        for cycle in cycles
+            c1 = get_candidate_on_way(cycle[1], way)
+            c2 = get_candidate_on_way(cycle[end], way)
+            if c2.λ - c1.λ < max_cycle_len
+                push!(cycles_λ, (c1.λ, c2.λ))
+            end
+        end
+        new_parts = copy(wway.parts)
+        for part in wway.parts 
+            for cycle_λ in cycles_λ
+                s = max(cycle_λ[1], part[1]) 
+                e = min(cycle_λ[2], part[2]) 
+                if s < e 
+                    cycle_part_len = e - s 
+                    cycle_len = cycle_λ[2] - cycle_λ[1]
+                    if cycle_part_len/cycle_len > min_fill_perc/100
+                        push!(new_parts, cycle_λ)  
+                    end
+                end
+            end
         end
         new_parts = merge_ranges(new_parts)
         walked_parts.ways[idx].parts = new_parts
