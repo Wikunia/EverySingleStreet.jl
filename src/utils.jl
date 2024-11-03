@@ -463,7 +463,24 @@ end
 function get_preference(key)
     return @load_preference(key, DEFAULT_PREFERNECE_VALUE[key])
 end
+                                                                                                                                                                                                
+hascycle(way::Way) = !allunique(way.nodes)
 
+function get_directed_graph(way::Way)
+    g = SimpleDiGraph(length(way.nodes))
+    for i in 1:length(way.nodes)-1
+        add_edge!(g, i, i+1)
+    end
+    for (nidx,node) in enumerate(way.nodes)
+        idxs = findall(n->(n.id == node.id), way.nodes)
+        filter!(i->i < nidx , idxs)
+        for idx in idxs
+            add_edge!(g, nidx, idx)
+        end
+    end
+    return g
+end
+                                                                                                
 function points2geojson(points, geojson_path)
     # Create GeoJSON features from points
     features = [

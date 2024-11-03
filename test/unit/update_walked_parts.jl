@@ -45,3 +45,18 @@
 
     EverySingleStreet.set_preferences!("EXTEND_WALKED_WAY_UP_TO" => prev_max)
 end
+
+@testset "Finish cycle if short and more than x perc done" begin 
+    city_map = EverySingleStreet.parse_map(joinpath(@__DIR__, "..", "data", "Altona.json"));
+    path = [
+        LLA(53.55087, 9.93710),
+        LLA(53.55110, 9.93694),
+        LLA(53.55120, 9.93708)
+    ]
+    times = [now()+i*Second(30) for i in 1:length(path)]
+    points = [EverySingleStreet.GPSPoint(p, ZonedDateTime(time, TimeZone("UTC"))) for (p, time) in zip(path, times)]
+
+    streetpaths = EverySingleStreet.map_matching(city_map, "test", points)
+    wp = EverySingleStreet.streetpaths_to_walked_parts(streetpaths, city_map.ways)
+   
+end
