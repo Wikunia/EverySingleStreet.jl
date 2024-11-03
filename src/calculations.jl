@@ -54,7 +54,14 @@ function point_linesegment_distance(p::Point2, a::Point2, b::Point2)
 	return norm(p_on_ab-p)
 end
 
-function get_candidate_on_way(idx::Int, way::Way; rev=false)
+"""
+    node_on_way_to_candidate(idx::Int, way::Way; rev=false)
+    node_on_way_to_candidate(node::Node, way::Way; rev=false)
+
+Given either the idx of a node on a way like `way.nodes[idx]` if not reversed or the node itself
+return the matching candidate by computing `λ` the time of the candidate is set to now in UTC.
+"""
+function node_on_way_to_candidate(idx::Int, way::Way; rev=false)
     nodes = rev ? reverse(way.nodes) : way.nodes
     node = nodes[idx]
     lla = LLA(node.lat, node.lon)
@@ -69,7 +76,7 @@ function get_candidate_on_way(idx::Int, way::Way; rev=false)
 end
 
 
-function get_candidate_on_way(node::Node, way::Way; rev=false)
+function node_on_way_to_candidate(node::Node, way::Way; rev=false)
     nodes = rev ? reverse(way.nodes) : way.nodes
     lla = LLA(node.lat, node.lon)
     gpspoint = GPSPoint(lla, ZonedDateTime(now(UTC), TimeZone("UTC")))
@@ -659,10 +666,10 @@ function get_segments(city_map, current_candidate, next_candidate, sp)
             nodes = reverse(nodes)
         end
         node = nodes[way_segment.from]
-        c1 = get_candidate_on_way(node, way_segment.way; rev=way_segment.rev)
+        c1 = node_on_way_to_candidate(node, way_segment.way; rev=way_segment.rev)
 
         node = nodes[way_segment.to]
-        c2 =  get_candidate_on_way(node, way_segment.way; rev=way_segment.rev)
+        c2 =  node_on_way_to_candidate(node, way_segment.way; rev=way_segment.rev)
         push!(segments, StreetSegment(c1, c2))
     end
 
@@ -879,8 +886,8 @@ function extend_walked_parts_cycle!(walked_parts)
         cycles = simplecycles(g)
         cycles_λ = Vector{Tuple{Float64, Float64}}()
         for cycle in cycles
-            c1 = get_candidate_on_way(cycle[1], way)
-            c2 = get_candidate_on_way(cycle[end], way)
+            c1 = node_on_way_to_candidate(cycle[1], way)
+            c2 = node_on_way_to_candidate(cycle[end], way)
             if c2.λ - c1.λ < max_cycle_len
                 push!(cycles_λ, (c1.λ, c2.λ))
             end
@@ -951,35 +958,12 @@ function get_walked_way(walked_parts::WalkedParts, way)
     return walked_dist, complete_dist
 end
 
-function get_candidate_on_way(way::Way, dist)
-    nodes = way.nodes
-    dists = [euclidean_distance(LLA(n1.lat, n1.lon), LLA(n2.lat, n2.lon)) for (n1,n2) in zip(nodes[1:end-1], nodes[2:end])]
-    cum_dists = cumsum(dists)
-    prepend!(cum_dists, 0)
-    from_idx = findlast(<=(dist), cum_dists)
-    if dist >= cum_dists[end]
-        lla = LLA(nodes[end].lat, nodes[end].lon)
-        gpspoint = GPSPoint(lla, ZonedDateTime(now(), TimeZone("UTC")))
-        candidate = Candidate(gpspoint, lla, way, false, dist, cum_dists[end])
-        return candidate
-    end
-    to_idx = from_idx+1
-    from_node = nodes[from_idx]
-    to_node = nodes[to_idx]
-
-    t = 1-(cum_dists[to_idx]-dist)/ (cum_dists[to_idx]-cum_dists[from_idx])
-    lla = LLA(get_interpolation_point(Point2(from_node.lat, from_node.lon), Point2(to_node.lat, to_node.lon), t)...)
-    gpspoint = GPSPoint(lla, ZonedDateTime(now(), TimeZone("UTC")))
-    candidate = Candidate(gpspoint, lla, way, false, 0.0, dist)
-    return candidate
-end
-
 function get_segments(walked_way::WalkedWay)
     segments = Vector{StreetSegment}()
     for part in walked_way.parts
 
-        from_candidate = get_candidate_on_way(walked_way.way, part[1])
-        to_candidate = get_candidate_on_way(walked_way.way, part[2])
+        from_candidate = node_on_way_to_candidate(walked_way.way, part[1])
+        to_candidate = node_on_way_to_candidate(walked_way.way, part[2])
         push!(segments, StreetSegment(from_candidate, to_candidate))
     end
     return segments
