@@ -463,3 +463,57 @@ end
 function get_preference(key)
     return @load_preference(key, DEFAULT_PREFERNECE_VALUE[key])
 end
+
+function points2geojson(points, geojson_path)
+    # Create GeoJSON features from points
+    features = [
+        Dict(
+            "type" => "Feature",
+            "geometry" => Dict(
+                "type" => "Point",
+                "coordinates" => [point.lon, point.lat]
+            ),
+            "properties" => Dict(
+                "id" => i 
+            )
+        ) for (i,point) in enumerate(points)
+    ]
+
+    # Create a FeatureCollection
+    geojson = Dict(
+        "type" => "FeatureCollection",
+        "features" => features
+    )
+
+    # Write to a GeoJSON file
+    open(geojson_path, "w") do file
+        JSON3.write(file, geojson)
+    end
+end
+
+function ways2geojson(ways, geojson_path)
+    # Create GeoJSON features from points
+    features = [
+        Dict(
+            "type" => "Feature",
+            "geometry" => Dict(
+                "type" => "LineString",
+                "coordinates" => [[node.lon, node.lat] for node in way.nodes]
+            ),
+            "properties" => Dict(
+                "id" => i 
+            )
+        ) for (i,way) in enumerate(ways)
+    ]
+
+    # Create a FeatureCollection
+    geojson = Dict(
+        "type" => "FeatureCollection",
+        "features" => features
+    )
+
+    # Write to a GeoJSON file
+    open(geojson_path, "w") do file
+        JSON3.write(file, geojson)
+    end
+end
