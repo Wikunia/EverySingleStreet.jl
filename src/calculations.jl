@@ -584,10 +584,25 @@ function calculate_streetpath(name, subpath_id, candidates, city_map; allow_recu
                 end
                 continue
             end
+            partial_segments = get_segments(city_map, current_candidate, next_candidate, sp)
+            len_shortest_path =  total_length(city_map, sp)u"m"
+            start_time = current_candidate.measured_point.time
+            finish_time = next_candidate.measured_point.time
+            duration = Quantity(finish_time - start_time)
+            speed = uconvert(u"km/hr", len_shortest_path/duration)
+
+            too_fast = speed > 20u"km/hr"
+
             any_non_walkable_road = any(nid->!city_map.walkable_road_nodes[city_map.osm_id_to_node_id[nid]], sp)
             # if recursive is allowed and some of the shortest path are not via walkable roads 
             # try to match those again to walkable roads
-            if allow_recursive && any_non_walkable_road
+            # also check if the shortest path is already too fast. If that is the case then this doesn't need to be computed
+            if !too_fast && allow_recursive && any_non_walkable_road
+                if !isempty(segments)
+                    push!(streetpaths, StreetPath(name, subpath_id, segments))
+                    subpath_id += 1
+                    segments = Vector{StreetSegment}()
+                end
                 nodes = [city_map.nodes[city_map.osm_id_to_node_id[nid]] for nid in sp]
                 points = [LLA(n.lat, n.lon) for n in nodes]
                 pushfirst!(points, current_candidate.measured_point.pos)
@@ -608,13 +623,8 @@ function calculate_streetpath(name, subpath_id, candidates, city_map; allow_recu
                 end
                 continue
             end
-            partial_segments = get_segments(city_map, current_candidate, next_candidate, sp)
-            len_shortest_path =  total_length(city_map, sp)u"m"
-            start_time = current_candidate.measured_point.time
-            finish_time = next_candidate.measured_point.time
-            duration = Quantity(finish_time - start_time)
-            speed = uconvert(u"km/hr", len_shortest_path/duration)
-            if speed > 20u"km/hr" && !isempty(segments)
+         
+            if too_fast && !isempty(segments)
                 push!(streetpaths, StreetPath(name, subpath_id, segments))
                 subpath_id += 1
                 segments = Vector{StreetSegment}()
