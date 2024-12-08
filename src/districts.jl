@@ -101,21 +101,63 @@ function map_nodes_to_district(nodes::Vector{Node}, geojson_fpath)
     return node_district
 end
 
-function update_district_walked!(district_kms::AbstractDict{Symbol, Float64}, city_map::AbstractSimpleMap, walkedway::WalkedWay)
+"""
+    update_district_walked!(district_kms::AbstractDict{Symbol, Float64}, city_map::AbstractSimpleMap, walkedway::WalkedWay)
+
+Update the total walked distance of each district after a [`WalkedWay`](@ref) is added to the map.
+
+# Arguments
+- `district_kms::AbstractDict{Symbol, Float64}`: A dictionary mapping district names (as Symbol) to their total walked distances in kilometers.
+- `city_map::AbstractSimpleMap`: The city map object that stores nodes and edges.
+- `walkedway::WalkedWay`: The walked way object added to the map.
+"""
+function update_district_walked!(district_kms::AbstractDict{Symbol, Float64}, city_map::AbstractSimpleMap, walkedway::WalkedWay, trans, rev_trans)
     way = walkedway.way
     nodes = way.nodes
     for part in walkedway.parts
         start_id = prev_idx(nodes, part[1])
         stop_id = prev_idx(nodes, part[2])+1
-        for i in start_id:stop_id-1
+        # check if all ids are in the same district 
+        district_names = Set{Symbol}()
+        for i in start_id:stop_id
+            node = nodes[i]
+            haskey(city_map.osm_id_to_node_id, node.id) || continue
+            internal_node_id = city_map.osm_id_to_node_id[node.id]
+            district = city_map.nodes_to_district_name[internal_node_id]
+            push!(district_names, district)
+        end
+        if length(district_names) == 1
+            district = collect(district_names)[1]
+            already_walked_in_district = get(district_kms, district, 0.0)
+            district_kms[district] = already_walked_in_district + (part[2] - part[1])
+            continue
+        end
+
+        # add distance from part[1] to next_node to the district of next node 
+        next_node = nodes[start_id+1]
+        first_point = get_gps_point(nodes, part[1], trans, rev_trans)
+        dist = euclidean_distance(first_point, LLA(next_node.lat, next_node.lon)) / 1000
+        internal_node_id = city_map.osm_id_to_node_id[next_node.id]
+        district = city_map.nodes_to_district_name[internal_node_id]
+        already_walked_in_district = get(district_kms, district, 0.0)
+        district_kms[district] = already_walked_in_district + dist
+
+        # add distance from part[2] to prev_idx to the district of the previous node 
+        prev_node = nodes[stop_id-1]
+        last_point = get_gps_point(nodes, part[2], trans, rev_trans)
+        dist = euclidean_distance(last_point, LLA(prev_node.lat, prev_node.lon)) / 1000
+        internal_node_id = city_map.osm_id_to_node_id[prev_node.id]
+        district = city_map.nodes_to_district_name[internal_node_id]
+        already_walked_in_district = get(district_kms, district, 0.0)
+        district_kms[district] = already_walked_in_district + dist
+
+        for i in start_id+1:stop_id-1
             node = nodes[i]
             next_node = nodes[i+1]
-            haskey(city_map.osm_id_to_node_id, node.id) || continue
-            haskey(city_map.osm_id_to_node_id, next_node.id) || continue
             internal_node_id = city_map.osm_id_to_node_id[node.id]
-            next_internal_node_id = city_map.osm_id_to_node_id[next_node.id]
+            internal_next_node_id = city_map.osm_id_to_node_id[next_node.id]
             district = city_map.nodes_to_district_name[internal_node_id]
-            next_district = city_map.nodes_to_district_name[next_internal_node_id]
+            next_district = city_map.nodes_to_district_name[internal_next_node_id]
             dist = euclidean_distance(LLA(node.lat, node.lon), LLA(next_node.lat, next_node.lon)) / 1000
             already_walked_in_district = get(district_kms, district, 0.0)
             district_kms[district] = already_walked_in_district + dist
@@ -154,9 +196,12 @@ end
 
 function get_district_kms(city_map::AbstractSimpleMap, walked_ways::Vector{WalkedWay}; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))
     district_kms = OrderedDict{Symbol, Float64}()
+    origin_lla = get_centroid(city_map.nodes)
+    trans = ENUfromLLA(origin_lla, wgs84)
+    rev_trans = LLAfromENU(origin_lla, wgs84)
     for walked_way in walked_ways
         filter_fct(walked_way.way) || continue
-        update_district_walked!(district_kms, city_map, walked_way)
+        update_district_walked!(district_kms, city_map, walked_way, trans, rev_trans)
     end
     sort!(district_kms; byvalue=true, rev=true)
     return district_kms
@@ -164,10 +209,13 @@ end
 
 function get_district_kms(city_map::AbstractSimpleMap; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))
     district_kms = OrderedDict{Symbol, Float64}()
+    origin_lla = get_centroid(city_map.nodes)
+    trans = ENUfromLLA(origin_lla, wgs84)
+    rev_trans = LLAfromENU(origin_lla, wgs84)
     for way in city_map.ways
         filter_fct(way) || continue
         walked_way = WalkedWay(way, [(0.0, total_length(way))])
-        update_district_walked!(district_kms, city_map, walked_way)
+        update_district_walked!(district_kms, city_map, walked_way, trans, rev_trans)
     end
     sort!(district_kms; byvalue=true, rev=true)
     return district_kms
@@ -178,6 +226,10 @@ function get_walked_district_perc(city_map::AbstractSimpleMap, walked_ways::Vect
     district_kms = get_district_kms(city_map)
     district_perc = OrderedDict{Symbol, Float64}()
     for district in keys(district_kms)
+        if district == :Cranz
+            @show district_kms[district]
+            @show walked_district_kms[district]
+        end
         if !haskey(walked_district_kms, district)
             district_perc[district] = 0.0
             continue 

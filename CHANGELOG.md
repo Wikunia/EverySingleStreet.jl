@@ -1,3 +1,8 @@
+## Unreleased
+### Bugfixes
+- District kms are calculated more correctly
+    - Still a section can be counted to two districts if one node is inside one and the next inside another district
+
 ## v0.1.1 (28th of November 2024)
 ### Bugfixes: 
 - shortest path contained non walkable roads but walkable roads were feasible 
