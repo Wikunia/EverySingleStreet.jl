@@ -226,10 +226,6 @@ function get_walked_district_perc(city_map::AbstractSimpleMap, walked_ways::Vect
     district_kms = get_district_kms(city_map)
     district_perc = OrderedDict{Symbol, Float64}()
     for district in keys(district_kms)
-        if district == :Cranz
-            @show district_kms[district]
-            @show walked_district_kms[district]
-        end
         if !haskey(walked_district_kms, district)
             district_perc[district] = 0.0
             continue 
