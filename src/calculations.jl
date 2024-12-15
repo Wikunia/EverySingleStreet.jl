@@ -463,8 +463,8 @@ function map_matching(gps_points::Vector{GPSPoint}, city_map::AbstractSimpleMap,
     end
     streetpaths = map_matching(map_local, name, gps_points)
     prev_walked_road_km = total_length(walked_parts; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
-    this_walked_parts = calculate_walked_parts(streetpaths, city_map.ways)
-    walked_parts = calculate_walked_parts(streetpaths, city_map.ways, walked_parts.ways)
+    this_walked_parts = calculate_walked_parts(streetpaths, city_map)
+    walked_parts = calculate_walked_parts(streetpaths, city_map, walked_parts.ways)
     now_walked_road_km = total_length(walked_parts; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
     this_walked_road_km = total_length(this_walked_parts; filter_fct=(way)->EverySingleStreet.iswalkable_road(way))/1000
     return (walked_parts = walked_parts, this_walked_parts = this_walked_parts, added_kms = now_walked_road_km - prev_walked_road_km, this_walked_road_km = this_walked_road_km)
@@ -859,7 +859,7 @@ function streetpaths_to_walked_parts(streetpaths::Vector{StreetPath}, city_ways:
 end
 
 """
-    calculate_walked_parts(streetpaths::Vector{StreetPath}, city_ways::Vector{Way}, walked_ways=Dict{Int, WalkedWay}())
+    calculate_walked_parts(streetpaths::Vector{StreetPath}, city_map::AbstractSimpleMap, walked_ways=Dict{Int, WalkedWay}())
 
 Return `WalkedParts` given the streetpath segments and the possible ways of the city.
 Can be added to already existing `walked_ways`. Filters everything which isn't a `walkable_road` inside `city_ways`.   
@@ -867,16 +867,74 @@ Calls several function to get a better approximation of what was actually walked
     - add extra buffer at start and end of streets to not miss the last few meters of a dead end street as an example [`extend_walked_parts!`](@ref)
     - closes circles like roundabouts, parts at ends of some dead end streets
 """
-function calculate_walked_parts(streetpaths::Vector{StreetPath}, city_ways::Vector{Way}, walked_ways=Dict{Int, WalkedWay}())
-    walked_parts = streetpaths_to_walked_parts(streetpaths, city_ways, walked_ways)
-    extend_walked_parts!(walked_parts)
+function calculate_walked_parts(streetpaths::Vector{StreetPath}, city_map::AbstractSimpleMap, walked_ways=Dict{Int, WalkedWay}())
+    walked_parts = streetpaths_to_walked_parts(streetpaths, city_map.ways, walked_ways)
+    extend_walked_parts!(walked_parts, city_map)
     return walked_parts
 end
 
-function extend_walked_parts!(walked_parts)
+function extend_walked_parts!(walked_parts, city_map)
+    extend_walked_parts_connectors!(walked_parts, city_map)
     extend_walked_parts_simple!(walked_parts)
     extend_walked_parts_cycle!(walked_parts)
 end
+
+"""
+    extend_walked_parts_connectors!(walked_parts, city_map)
+
+1. Find all the city ways that are shorter than 2*EXTEND_WALKED_WAY_UP_TO
+2. Check if the end of those ways is part of some already walked 
+"""
+function extend_walked_parts_connectors!(walked_parts, city_map)
+    max_connector_length = 2*get_preference("EXTEND_WALKED_WAY_UP_TO")
+    city_ways = city_map.ways
+    walkable_roads = filter(iswalkable_road, city_ways)
+    connectors = filter(w->w.meters < max_connector_length, walkable_roads)
+    filter!(w->!isfullywalked(walked_parts,w), connectors)
+    node_tpls = [(w.nodes[1], w.nodes[end]) for w in connectors]
+    added_m = 0.0
+    for (connector, node_tpl) in zip(connectors, node_tpls)
+        if check_if_visited_node(city_map, node_tpl[1], walked_parts.ways)
+            if check_if_visited_node(city_map, node_tpl[2], walked_parts.ways)
+                if haskey(walked_parts.ways, connector.id)
+                    added_m -= sum(p->p[2]-p[1], walked_parts.ways[connector.id].parts) 
+                end
+                walked_parts.ways[connector.id] = WalkedWay(connector, [(0.0, connector.meters)])
+                added_m += connector.meters
+            end
+        end
+    end
+end
+
+"""
+    isfullywalked(walked_parts, way::Way)
+
+Return whether the way is already completely walked.
+"""
+function isfullywalked(walked_parts, way::Way)
+    ww = get(walked_parts.ways, way.id, nothing)
+    isnothing(ww) && return false 
+    length(ww.parts) > 1 && return false 
+    part = ww.parts[1]
+    return part[1] == 0.0 && part[2] ≈ way.meters
+end
+
+"""
+    check_if_visited_node(city_map, node::Node, walked_parts)
+
+Return whether the node was visited already.
+"""
+function check_if_visited_node(city_map, node::Node, walked_parts)
+    pws = get_possible_ways(city_map, node.id)
+    for pw in pws 
+        c = node_on_way_to_candidate(node, pw)
+        ww = get(walked_parts, c.way.id, nothing)
+        isnothing(ww) && continue
+        any(p->p[1] <= c.λ <= p[2], ww.parts) && return true
+    end
+    return false
+end
+
 
 """
     extend_walked_parts_simple!(walked_parts)
@@ -1128,7 +1186,7 @@ end
 
 function full_update_routine(city_map, folder, jld2_path, output_folder=".")
     streetpaths = update_map_matching(city_map, folder, jld2_path)
-    walked_parts = calculate_walked_parts(streetpaths, city_map.ways);
+    walked_parts = calculate_walked_parts(streetpaths, city_map);
     xml_path = joinpath(output_folder, "walked.xml")
     osm_path = joinpath(output_folder, "walked.osm.pbf")
     create_xml(city_map.nodes, walked_parts, xml_path)

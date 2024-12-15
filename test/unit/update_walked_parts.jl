@@ -20,14 +20,14 @@
     prev_max = EverySingleStreet.get_preference("EXTEND_WALKED_WAY_UP_TO")
     EverySingleStreet.set_preferences!("EXTEND_WALKED_WAY_UP_TO" => 5)
 
-    EverySingleStreet.extend_walked_parts!(wp)
+    EverySingleStreet.extend_walked_parts!(wp, city_map)
     wway = wp.ways[172200103]
     # the street shouldn't be fully finished because of the preference of just adding up to 5m
     @test EverySingleStreet.total_length(wp) < wway.way.meters
     @test wway.parts[1][2] - wway.parts[1][1] ≈ EverySingleStreet.total_length(wp)
 
     EverySingleStreet.set_preferences!("EXTEND_WALKED_WAY_UP_TO" => 8)
-    EverySingleStreet.extend_walked_parts!(wp)
+    EverySingleStreet.extend_walked_parts!(wp, city_map)
     wway = wp.ways[172200103]
     # the way should be finished up til the end but not the start
     @test EverySingleStreet.total_length(wp) < wway.way.meters
@@ -35,7 +35,7 @@
     @test wway.parts[1][2] ≈ wway.way.meters
 
     EverySingleStreet.set_preferences!("EXTEND_WALKED_WAY_UP_TO" => 12)
-    EverySingleStreet.extend_walked_parts!(wp)
+    EverySingleStreet.extend_walked_parts!(wp, city_map)
     wway = wp.ways[172200103]
     # the way should be completed
     @test EverySingleStreet.total_length(wp) ≈ wway.way.meters
