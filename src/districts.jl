@@ -129,7 +129,8 @@ function update_district_walked!(district_kms::AbstractDict{Symbol, Float64}, ci
         if length(district_names) == 1
             district = collect(district_names)[1]
             already_walked_in_district = get(district_kms, district, 0.0)
-            district_kms[district] = already_walked_in_district + (part[2] - part[1])
+            dist = (part[2] - part[1]) / 1000
+            district_kms[district] = already_walked_in_district + dist
             continue
         end
 
