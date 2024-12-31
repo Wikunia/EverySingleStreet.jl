@@ -277,12 +277,13 @@ function get_candidates(city_map, path)
         filter!(wid->iswalkable_road(city_map.ways[wid]), search_way_ids)
         p_candidates = get_matching_candidates(city_map, search_way_ids, p, origin_lla)
         filter_candidates!(p_candidates)
-        if isempty(p_candidates) && previously_found
-            previously_found = false
-            push!(candidates, find_in_between_candidates(city_map, way_tree, id_to_way_id, path[i-1], p, origin_lla, radius))
+        if isempty(p_candidates)
+            if previously_found
+                previously_found = false
+                push!(candidates, find_in_between_candidates(city_map, way_tree, id_to_way_id, path[i-1], p, origin_lla, radius))
+            end
         else
-            # find a point closest to the previous which didn't have any canddiates
-            if !previously_found && i > 1
+            if !previously_found && i > 1 # find a point closest to the previous which didn't have any canddiates
                 push!(candidates, find_in_between_candidates(city_map, way_tree, id_to_way_id, p, path[i-1], origin_lla, radius))
             end
             previously_found = true
