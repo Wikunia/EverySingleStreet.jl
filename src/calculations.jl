@@ -199,6 +199,54 @@ function filter_candidates!(candidates)
     filter!(c->c.dist <= closer_dist, candidates)
 end
 
+
+"""
+    find_in_between_candidates(city_map::AbstractSimpleMap, way_tree::KDTree, id_to_way_id, p1::GPSPoint, p2::GPSPoint, origin_lla::LLA, radius)
+
+Return candidates that are as close as possible to p2 on the line from p1 to p2. 
+This should be called when there are no candidates for p2 but there are for p1. 
+In that case we want to find candidates for the last point that we still have candidates for.
+"""
+function find_in_between_candidates(city_map::AbstractSimpleMap, way_tree::KDTree, id_to_way_id, p1::GPSPoint, p2::GPSPoint, origin_lla::LLA, radius)
+    dist = euclidean_distance(p1.pos, p2.pos)
+    if dist < 5
+        return Vector{Candidate}()
+    end
+    candidates = Vector{Candidate}()
+    last_found_candidates = Vector{Candidate}()
+    while euclidean_distance(p1.pos, p2.pos) > 5
+        mid = midpoint(p1, p2)
+        candidates = get_candidates(city_map, way_tree, id_to_way_id, mid, origin_lla, radius)
+        if isempty(candidates)
+            p2 = mid
+        else 
+            last_found_candidates = candidates
+            p1 = mid
+        end
+    end
+    return last_found_candidates
+end
+
+
+"""
+    get_candidates(city_map::AbstractSimpleMap, way_tree::KDTree, id_to_way_id, p::GPSPoint, origin_lla::LLA, radius)
+
+Get canddiates for a single point given already a kdtree which can map the point to possible candidate ways and so on.
+This function is used by [`find_in_between_candidates`](@ref). 
+"""
+function get_candidates(city_map::AbstractSimpleMap, way_tree::KDTree, id_to_way_id, p::GPSPoint, origin_lla::LLA, radius)
+    trans = ENUfromLLA(origin_lla, wgs84)
+    kps = zeros(Float64, (2, 1))
+    kps[:,1] .= getxy(p, trans)
+    idxs = inrange(way_tree, kps, radius)[1]
+
+    search_way_ids = unique(id_to_way_id[idxs])
+    filter!(wid->iswalkable_road(city_map.ways[wid]), search_way_ids)
+    p_candidates = get_matching_candidates(city_map, search_way_ids, p, origin_lla)
+    filter_candidates!(p_candidates)
+    return p_candidates
+end
+
 """
     get_candidates(map, path)
 
@@ -222,13 +270,24 @@ function get_candidates(city_map, path)
 
     candidates = Vector{Vector{Candidate}}()
     i = 0
+    previously_found = false
     for p in path
         i += 1
         search_way_ids = unique(id_to_way_id[idxs[i]])
         filter!(wid->iswalkable_road(city_map.ways[wid]), search_way_ids)
         p_candidates = get_matching_candidates(city_map, search_way_ids, p, origin_lla)
         filter_candidates!(p_candidates)
-        push!(candidates, p_candidates)
+        if isempty(p_candidates) && previously_found
+            previously_found = false
+            push!(candidates, find_in_between_candidates(city_map, way_tree, id_to_way_id, path[i-1], p, origin_lla, radius))
+        else
+            # find a point closest to the previous which didn't have any canddiates
+            if !previously_found && i > 1
+                push!(candidates, find_in_between_candidates(city_map, way_tree, id_to_way_id, p, path[i-1], origin_lla, radius))
+            end
+            previously_found = true
+            push!(candidates, p_candidates)
+        end
     end
     return candidates
 end

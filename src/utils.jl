@@ -534,3 +534,34 @@ function ways2geojson(ways, geojson_path)
         JSON3.write(file, geojson)
     end
 end
+
+"""
+    midpoint(p1::GPSPoint, p2::GPSPoint)
+
+Calculates the midpoint between two GPS points.
+
+This function takes two `GPSPoint` objects as input, each containing a position
+represented by `LLA` (Latitude, Longitude, Altitude) coordinates and a
+timestamp represented by `ZonedDateTime`. It calculates the midpoint in
+ECEF (Earth-Centered, Earth-Fixed) coordinates for accuracy, then converts
+the result back to LLA. The time of the midpoint is also interpolated linearly.
+
+# Arguments
+- `p1::GPSPoint`: The first GPS point.
+- `p2::GPSPoint`: The second GPS point.
+
+# Returns
+A `GPSPoint` object representing the midpoint between `p1` and `p2`.
+"""
+function midpoint(p1::GPSPoint, p2::GPSPoint)
+    ecef1 = ECEF(p1.pos, wgs84)
+    ecef2 = ECEF(p2.pos, wgs84)
+
+    mid_ecef = (ecef1 + ecef2) / 2
+
+    mid_lla = LLA(mid_ecef, wgs84)
+
+    mid_time = p1.time + (p2.time - p1.time) ÷ 2
+
+    return GPSPoint(mid_lla, mid_time)
+end
