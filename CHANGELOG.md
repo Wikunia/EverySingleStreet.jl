@@ -1,3 +1,7 @@
+## Unreleased
+### Other
+- Fill some small gaps
+
 ## v0.1.2 (31st of December 2024)
 ### Bugfixes
 - District kms are calculated more correctly

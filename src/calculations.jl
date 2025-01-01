@@ -1000,13 +1000,25 @@ end
     extend_walked_parts_simple!(walked_parts)
 
 Extend the walked parts by adding up to `EXTEND_WALKED_WAY_UP_TO` to the start and end of a walked way.
+As well as to fill gaps in between parts.
 """
 function extend_walked_parts_simple!(walked_parts)
     extend_up_to = get_preference("EXTEND_WALKED_WAY_UP_TO")
     for (idx, wway) in walked_parts.ways
         len_way = total_length(wway.way)
         new_parts = Vector{Tuple{Float64, Float64}}()
-        for part in wway.parts
+        # extend gaps 
+        for (part1, part2) in zip(wway.parts[1:end-1], wway.parts[2:end])
+            s,e = part1[1], part1[2]
+            if part1[2] + extend_up_to >= part2[1]
+                e = part2[1]
+            end
+            push!(new_parts, (s,e))
+        end
+        push!(new_parts, wway.parts[end])
+        extended_parts = copy(new_parts)
+        new_parts = Vector{Tuple{Float64, Float64}}()
+        for part in extended_parts
             s = part[1]
             e = part[2]
             if part[1] < extend_up_to
