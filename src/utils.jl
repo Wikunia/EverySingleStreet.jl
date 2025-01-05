@@ -480,8 +480,22 @@ function get_directed_graph(way::Way)
     end
     return g
 end
-                                                                                                
-function points2geojson(points, geojson_path)
+   
+"""
+    points2geojson(vec_candidates::Vector{Vector{Candidate}}, geojson_path)
+    points2geojson(points::Vector{<:LLA}, geojson_path)
+
+Debug functions to visualize candidates or simple LLA points using tools like: geojson.io/
+"""
+function points2geojson(vec_candidates::Vector{Vector{Candidate}}, geojson_path)
+    llas = LLA[]
+    for vec_candidate in vec_candidates
+        append!(llas, [c.lla for c in vec_candidate])
+    end
+    return points2geojson(llas, geojson_path)
+end
+
+function points2geojson(points::Vector{<:LLA}, geojson_path)
     # Create GeoJSON features from points
     features = [
         Dict(
