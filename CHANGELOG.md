@@ -1,4 +1,8 @@
 ## Unreleased
+### Bugfixes
+- In certain situations the gps points might be off 
+- The too fast check is only applied if the distance is over 50m
+    - For shorter ones the GPS deviation plays a bigger role and speed calculation might be off
 ### Other
 - Fill some small gaps
 
