@@ -652,7 +652,7 @@ function calculate_streetpath(name, subpath_id, candidates, city_map; allow_recu
         if current_candidate.way.id == next_candidate.way.id
             if current_candidate.way_is_reverse == next_candidate.way_is_reverse
                 push!(segments, StreetSegment(current_candidate, next_candidate))
-        else
+            else
                 next_candidate = get_reverse_candidate(next_candidate)
                 push!(segments, StreetSegment(current_candidate, next_candidate))
             end
@@ -673,7 +673,8 @@ function calculate_streetpath(name, subpath_id, candidates, city_map; allow_recu
             duration = Quantity(finish_time - start_time)
             speed = uconvert(u"km/hr", len_shortest_path/duration)
 
-            too_fast = speed > 20u"km/hr"
+            # don't check speed limit if the added amount is short
+            too_fast = speed > 20u"km/hr" && len_shortest_path > 50u"m"
 
             any_non_walkable_road = any(nid->!city_map.walkable_road_nodes[city_map.osm_id_to_node_id[nid]], sp)
             # if recursive is allowed and some of the shortest path are not via walkable roads 
