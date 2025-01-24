@@ -174,9 +174,9 @@ function combine_gpx_tracks(folder)
 
     xdoc = XMLDocument(gpx)
 
-
     fname = "generated.gpx"
     save_file(xdoc, fname)
+    free(xdocs)
     println("GPX file saved to \"$fname\"")
 end
 
