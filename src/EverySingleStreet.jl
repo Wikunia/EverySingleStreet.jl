@@ -24,6 +24,7 @@ using OrderedCollections
 using PolygonInbounds
 using Preferences
 using ProgressMeter
+using SimpleWeightedGraphs
 using SparseArrays
 using StaticGraphs
 using Statistics
@@ -47,5 +48,6 @@ include("calculations.jl")
 include("shortest_path.jl")
 include("districts.jl")
 include("drawing.jl")
+include("routing.jl")
 
 end

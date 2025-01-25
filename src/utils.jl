@@ -381,6 +381,15 @@ end
     end
 end
 
+@inline function Base.getproperty(n::Node, s::Symbol)
+    if s == :lla
+        return LLA(n.lat, n.lon)
+    else
+        getfield(n, s)
+    end
+end
+
+
 """
 Use a non-recursive Douglas-Peucker algorithm to simplify a polygon. Used by `simplify()`.
 
@@ -578,4 +587,57 @@ function midpoint(p1::GPSPoint, p2::GPSPoint)
     mid_time = p1.time + (p2.time - p1.time) ÷ 2
 
     return GPSPoint(mid_lla, mid_time)
+end
+
+"""
+    get_kd_tree_from_points(points, origin_lla)
+
+Return a KDTree given gps points or nodes and a origin_lla to as the points are transformed using `ENUfromLLA`.
+"""
+function get_kd_tree_from_points(points, origin_lla::LLA)
+    transformed_points = get_transformed_points(points, origin_lla)
+    kd_tree = KDTree(transformed_points)
+    return kd_tree
+end
+
+"""
+    get_transformed_points(points, origin_lla::LLA)
+
+Transform a list of gps_points or nodes to a vector of `Vector{Point2{Float64}}`
+"""
+function get_transformed_points(points, origin_lla::LLA)
+    trans = ENUfromLLA(origin_lla, wgs84)
+    transformed_points = Vector{Point2{Float64}}(undef, length(points))
+    for (i, point) in enumerate(points)
+        transformed_points[i] = Point2(getxy(point, trans))
+    end
+    return transformed_points
+end
+
+"""
+    create_gpx_document(lla_points::Vector{<:LLA})
+"""
+function create_gpx_document(lla_points::Vector{<:LLA})
+    author = GPX.GPXAuthor("EverySingleStreet.jl")
+
+    metadata = GPX.GPXMetadata(
+        name="EverySingleStreet",
+        author=author,
+        time=now(localzone())
+    )
+
+    gpx = GPX.GPXDocument(metadata)
+
+    track = GPX.new_track(gpx)
+    track_segment = GPX.new_track_segment(track)
+
+    t = ZonedDateTime(now(UTC), TimeZone("UTC"))
+    for point in lla_points
+        point = GPX.GPXPoint(point.lat, point.lon, 0, t, "")
+        push!(track_segment, point)
+    end
+
+    xdoc = XMLDocument(gpx)
+
+    return xdoc
 end
