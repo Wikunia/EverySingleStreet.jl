@@ -176,7 +176,7 @@ function combine_gpx_tracks(folder)
 
     fname = "generated.gpx"
     save_file(xdoc, fname)
-    free(xdocs)
+    LightXML.free(xdocs)
     println("GPX file saved to \"$fname\"")
 end
 

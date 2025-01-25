@@ -4,6 +4,7 @@ using Test
 using Dates
 using Geodesy
 using TimeZones
+using LightXML
 
 @testset "EverySingleStreet.jl" begin
     include("unit/download.jl")
