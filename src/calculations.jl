@@ -1078,6 +1078,27 @@ function extend_walked_parts_cycle!(walked_parts)
     return walked_parts
 end
 
+"""
+    intersection(range1::Tuple{T, T}, range2::Tuple{T, T}) where T
+
+Return the intersection of the two ranges as a `Tuple{T, T}` or `nothing` if they don't intersect.
+"""
+function intersection(range1::Tuple{T, T}, range2::Tuple{T, T}) where T
+    intersection_start = max(range1[1], range2[1])
+    intersection_end = min(range1[2], range2[2])
+
+    if intersection_start <= intersection_end  # Check for actual intersection
+       return (intersection_start, intersection_end)
+    else 
+        return nothing
+    end
+end
+
+"""
+    merge_ranges(ranges::Vector{Tuple{T, T}}) where T
+
+Merge the given ranges together and return a new vector of merged ranges which are also sorted.
+"""
 function merge_ranges(ranges::Vector{Tuple{T, T}}) where T
     # sort the ranges by their start value
     sorted_ranges = sort(ranges, by = x -> x[1])
