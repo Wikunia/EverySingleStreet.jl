@@ -31,6 +31,17 @@ end
     @test haskey(district_percentages, :Innenstadt)
     @test haskey(district_percentages, Symbol("Sankt Lorenz Süd"))
 
+    district_levels = Dict(k=>round(Int, v/10) for (k,v) in district_percentages)
+    EverySingleStreet.create_xml(city_map.nodes, nt.walked_parts, "test.xml"; districts = city_map.districts, district_levels)
+    xml = parse_file("test.xml")
+    xroot = LightXML.root(xml)
+    ways = EverySingleStreet.get_ways_from_walked_parts(nt.walked_parts)
+    # the districts don't have holes 
+    @test length(LightXML.get_elements_by_tagname(xroot, "way")) == length(ways) + sum(length(d.polygons) for d in city_map.districts)
+    free(xml)
+    rm("test.xml")
+
+
     # centroid of filtered walked parts 
     walked_parts = nt.walked_parts
     way_ids = nt.walked_parts.names["Große Altefähre"]

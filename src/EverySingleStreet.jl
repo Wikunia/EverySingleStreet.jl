@@ -14,6 +14,7 @@ using HMMBase
 using JLD2
 using JSON3
 using LightOSM
+import LightXML
 using LightXML: XMLDocument, save_file, create_root, new_child, add_text, set_attribute, set_attributes
 using LinearAlgebra
 import Luxor

@@ -356,7 +356,7 @@ function _parse_gpx(xdoc::XMLDocument)
         end
     end
 
-    free(xdoc)
+    LightXML.free(xdoc)
 
     gpx = GPXDocument(metadata, tracks=tracks)
 

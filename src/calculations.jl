@@ -1188,9 +1188,8 @@ function streetpaths_to_gpx(streetpaths::Vector{StreetPath}, gps_filename)
     end
 
     xdoc = XMLDocument(gpx)
-
-
     save_file(xdoc, gps_filename)
+    LightXML.free(xdoc)
     println("GPX file saved to \"$gps_filename\"")
 end
 
@@ -1221,9 +1220,8 @@ function walked_parts_to_gpx(walked_parts::WalkedParts, gps_filename)
     end
 
     xdoc = XMLDocument(gpx)
-
-
     save_file(xdoc, gps_filename)
+    LightXML.free(xdoc)
     println("GPX file saved to \"$gps_filename\"")
 end
 
@@ -1442,4 +1440,5 @@ function create_xml(all_nodes::Vector{Node}, walked_parts::WalkedParts, fname; d
     end
 
     save_file(xdoc, fname)
+    LightXML.free(xdoc)
 end
