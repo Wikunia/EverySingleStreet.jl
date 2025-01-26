@@ -337,18 +337,18 @@ function get_prev_node_id(candidate::Candidate)
 end
 
 """
-    shortest_candidate_path(from::Candidate, to::Candidate, city_map)
+    shortest_candidate_path(from::Candidate, to::Candidate, city_map; only_walkable_road=false)
 
 Return the shortest path as node ids from one candidate to another given a city map.
 """
-function shortest_candidate_path(from::Candidate, to::Candidate, city_map)
+function shortest_candidate_path(from::Candidate, to::Candidate, city_map; only_walkable_road=false)
     from_ids = (get_prev_node_id(from), get_next_node_id(from))
     to_ids = (get_prev_node_id(to), get_next_node_id(to))
     shortest_dist = Inf
     shortest_sp = nothing
     for sp_from_id in from_ids
         for sp_to_id in to_ids
-            sp = get_shortest_path(city_map, sp_from_id, sp_to_id)
+            sp = get_shortest_path(city_map, sp_from_id, sp_to_id; only_walkable_road)
             isnothing(sp) && continue
             dist = total_length(city_map, sp)
             dist += euclidean_distance(from.lla, get_lla(city_map, sp[1]))
@@ -661,22 +661,34 @@ function calculate_streetpath(name, subpath_id, candidates, city_map; allow_recu
             if isnothing(sp)
                 if !isempty(segments)
                     push!(streetpaths, StreetPath(name, subpath_id, segments))
-                    subpath_id += 1
+                subpath_id += 1
                     segments = Vector{StreetSegment}()
                 end
                 continue
             end
-            partial_segments = get_segments(city_map, current_candidate, next_candidate, sp)
             len_shortest_path =  total_length(city_map, sp)u"m"
+            any_non_walkable_road = any(nid->!city_map.walkable_road_nodes[city_map.osm_id_to_node_id[nid]], sp)
             start_time = current_candidate.measured_point.time
             finish_time = next_candidate.measured_point.time
             duration = Quantity(finish_time - start_time)
+
             speed = uconvert(u"km/hr", len_shortest_path/duration)
 
             # don't check speed limit if the added amount is short
             too_fast = speed > 20u"km/hr" && len_shortest_path > 50u"m"
 
-            any_non_walkable_road = any(nid->!city_map.walkable_road_nodes[city_map.osm_id_to_node_id[nid]], sp)
+            if !too_fast && any_non_walkable_road
+                sp_only_walkable = shortest_candidate_path(current_candidate, next_candidate, city_map; only_walkable_road=true)
+                len_sp_only_walkable =  total_length(city_map, sp_only_walkable)u"m"
+                speed_only_walkable = uconvert(u"km/hr", len_sp_only_walkable/duration)
+                too_fast_only_walkable = speed_only_walkable > 20u"km/hr" && len_sp_only_walkable > 50u"m"
+                if !too_fast_only_walkable
+                    sp = sp_only_walkable
+                    any_non_walkable_road = false
+                end
+            end
+            partial_segments = get_segments(city_map, current_candidate, next_candidate, sp)
+            
             # if recursive is allowed and some of the shortest path are not via walkable roads 
             # try to match those again to walkable roads
             # also check if the shortest path is already too fast. If that is the case then this doesn't need to be computed
@@ -699,7 +711,7 @@ function calculate_streetpath(name, subpath_id, candidates, city_map; allow_recu
                 pushfirst!(cum_dists, 0.0u"m")
                 times = start_time .+ ceil.(Second, [d/len_shortest_path * duration for d in cum_dists])
                 gps_points = [GPSPoint(p, t) for (p, t) in zip(points, times)]
-                extra_paths = map_matching(city_map, "extra", gps_points; allow_recursive=false, point_dist=0.0)
+                extra_paths = map_matching(city_map, "extra_$ci", gps_points; allow_recursive=false, point_dist=0.0)
                 for extra_path in extra_paths
                     push!(streetpaths, StreetPath(name, subpath_id, extra_path.segments))
                     subpath_id += 1

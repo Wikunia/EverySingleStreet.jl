@@ -4,6 +4,8 @@
 - The too fast check is only applied if the distance is over 50m
     - For shorter ones the GPS deviation plays a bigger role and speed calculation might be off
 - Free memory whenever `LightXML` is used
+- Shortest path has non walkable roads is now fixed with earlier by using shortest path only walkable calculation
+    - This fixes a bug for which splitting still resulted in shortest path via non walkable
 ### Other
 - Fill some small gaps
 
