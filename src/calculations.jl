@@ -679,12 +679,14 @@ function calculate_streetpath(name, subpath_id, candidates, city_map; allow_recu
 
             if !too_fast && any_non_walkable_road
                 sp_only_walkable = shortest_candidate_path(current_candidate, next_candidate, city_map; only_walkable_road=true)
-                len_sp_only_walkable =  total_length(city_map, sp_only_walkable)u"m"
-                speed_only_walkable = uconvert(u"km/hr", len_sp_only_walkable/duration)
-                too_fast_only_walkable = speed_only_walkable > 20u"km/hr" && len_sp_only_walkable > 50u"m"
-                if !too_fast_only_walkable
-                    sp = sp_only_walkable
-                    any_non_walkable_road = false
+                if !isnothing(sp_only_walkable)
+                    len_sp_only_walkable =  total_length(city_map, sp_only_walkable)u"m"
+                    speed_only_walkable = uconvert(u"km/hr", len_sp_only_walkable/duration)
+                    too_fast_only_walkable = speed_only_walkable > 20u"km/hr" && len_sp_only_walkable > 50u"m"
+                    if !too_fast_only_walkable && len_sp_only_walkable - 2*get_preference("EXTEND_WALKED_WAY_UP_TO")u"m" <= len_shortest_path 
+                        sp = sp_only_walkable
+                        any_non_walkable_road = false
+                    end
                 end
             end
             partial_segments = get_segments(city_map, current_candidate, next_candidate, sp)
