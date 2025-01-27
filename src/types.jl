@@ -79,15 +79,17 @@ Holds pre-computed shortest paths between nodes in a city.
 # Fields
  - `g::StaticGraphs.StaticDiGraph{Int32, Int32}`: The underlying StaticDiGraph{Int32, Int32} representing the street network.
  - `dist_mat::SparseArrays.SparseMatrixCSC{Float64, Int32}`: A SparseMatrixCSC{Float64, Int32} containing the distance matrix for the nodes in a sparse matrix.
- - `distances::Vector{Dict{Int32, Float64}}`: A vector of dictionaries, where each dictionary maps a destination node ID to its shortest distance from the source node.
+ - `dist_mat_walkable::SparseArrays.SparseMatrixCSC{Float64, Int32}`: Same as `dist_mat` but edges that are not classified as [`iswalkable_road`](@ref) have the maximum weight.
  - `parents::Vector{Dict{Int32, Int32}}`: A vector of dictionaries, where each dictionary maps a destination node ID to its parent node on the shortest path from the source node.
+ - `parents_walkable::Vector{Dict{Int32, Int32}}`: Same as `parents` but based on `dist_mat_walkable`
  - `distance::Float64`: The distance for which all the shortest paths are computed
 """
 struct BoundedAllShortestPaths
     g::StaticGraphs.StaticDiGraph{Int32, Int32}
     dist_mat::SparseArrays.SparseMatrixCSC{Float64, Int32}
-    distances::Vector{Dict{Int32, Float64}}
+    dist_mat_walkable::SparseArrays.SparseMatrixCSC{Float64, Int32}
     parents::Vector{Dict{Int32, Int32}}
+    parents_walkable::Vector{Dict{Int32, Int32}}
     distance::Float64
 end 
 

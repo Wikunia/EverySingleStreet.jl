@@ -126,7 +126,7 @@ function parse_map(fpath, geojson_path=nothing)
     json, no_graph_map = parse_no_graph_map(fpath, geojson_path)
     json_string = convert_keys_recursive(json)
     graph = graph_from_object(json_string; weight_type=:distance, network_type=:all, largest_connected_component=false)
-    bounded_shortest_paths = bounded_all_shortest_paths(graph, 0.25, no_graph_map.osm_id_to_node_id, no_graph_map.walkable_road_nodes)
+    bounded_shortest_paths = bounded_all_shortest_paths(no_graph_map, graph, 0.25)
     return Map(no_graph_map, graph, bounded_shortest_paths)
 end
 
@@ -483,6 +483,7 @@ end
    
 """
     points2geojson(vec_candidates::Vector{Vector{Candidate}}, geojson_path)
+    points2geojson(points::Vector{GPSPoint}, geojson_path)
     points2geojson(points::Vector{<:LLA}, geojson_path)
 
 Debug functions to visualize candidates or simple LLA points using tools like: geojson.io/
@@ -494,6 +495,8 @@ function points2geojson(vec_candidates::Vector{Vector{Candidate}}, geojson_path)
     end
     return points2geojson(llas, geojson_path)
 end
+
+points2geojson(points::Vector{GPSPoint}, geojson_path) = points2geojson([p.pos for p in points], geojson_path)
 
 function points2geojson(points::Vector{<:LLA}, geojson_path)
     # Create GeoJSON features from points
@@ -510,6 +513,36 @@ function points2geojson(points::Vector{<:LLA}, geojson_path)
         ) for (i,point) in enumerate(points)
     ]
 
+    # Create a FeatureCollection
+    geojson = Dict(
+        "type" => "FeatureCollection",
+        "features" => features
+    )
+
+    # Write to a GeoJSON file
+    open(geojson_path, "w") do file
+        JSON3.write(file, geojson)
+    end
+end
+
+function streetpaths2geojson(streetpaths::Vector{StreetPath}, geojson_path)
+    features = []
+    i = 0
+    for streetpath in streetpaths
+        for segment in streetpath.segments
+            push!(features, Dict(
+                "type" => "Feature",
+                "geometry" => Dict(
+                    "type" => "LineString",
+                    "coordinates" => [[segment.from.lla.lon, segment.from.lla.lat], [segment.to.lla.lon, segment.to.lla.lat]]
+                ),
+                "properties" => Dict(
+                    "id" => i
+                )
+            ))
+            i += 1
+        end
+    end
     # Create a FeatureCollection
     geojson = Dict(
         "type" => "FeatureCollection",
@@ -548,6 +581,55 @@ function ways2geojson(ways, geojson_path)
         JSON3.write(file, geojson)
     end
 end
+
+
+function create_connection_geojson(gps_points::Vector{GPSPoint}, candidate_points::Vector{Vector{Candidate}}, filepath::String; indices=1:length(gps_points))
+    features = []
+
+    color_hex = ["#ff0000", "#00ff00", "#0000ff"]
+
+    # Add GPS points
+    for (i, gps) in enumerate(gps_points)
+        i in indices || continue
+        push!(features, Dict(
+            "type" => "Feature",
+            "geometry" => Dict("type" => "Point", "coordinates" => [gps.pos.lon, gps.pos.lat]),
+            "properties" => Dict("type" => "gps", "id" => i, "marker-color" => color_hex[mod1(i, end)], "marker-symbol" => "circle")
+        ))
+    end
+
+    # Add candidate points
+    for (i, candidates) in enumerate(candidate_points)
+        i in indices || continue
+        for (j, candidate) in enumerate(candidates)
+            push!(features, Dict(
+                "type" => "Feature",
+                "geometry" => Dict("type" => "Point", "coordinates" => [candidate.lla.lon, candidate.lla.lat]),
+                "properties" => Dict("type" => "candidate", "parent_id" => i, "candidate_id" => j, "marker-color" => color_hex[mod1(i, end)], "marker-symbol" => "star")
+            ))
+        end
+    end
+
+    # Add connecting lines
+    for (i, candidates) in enumerate(candidate_points)
+        i in indices || continue
+        for candidate in candidates
+            gps_point = gps_points[i]
+            push!(features, Dict(
+                "type" => "Feature",
+                "geometry" => Dict("type" => "LineString", "coordinates" => [[gps_point.pos.lon, gps_point.pos.lat], [candidate.lla.lon, candidate.lla.lat]]),
+                "properties" => Dict("type" => "connection", "parent_id" => i, "marker-color" => color_hex[mod1(i, end)])
+            ))
+        end
+    end
+
+    # Create FeatureCollection and write to file
+    geojson = Dict("type" => "FeatureCollection", "features" => features)
+    open(filepath, "w") do file
+        JSON3.write(file, geojson)
+    end
+end
+
 
 """
     midpoint(p1::GPSPoint, p2::GPSPoint)
