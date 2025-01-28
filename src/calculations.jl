@@ -859,14 +859,16 @@ function total_length(ways::Vector{Way}; filter_fct=(way)->true)
     return dist
 end
 
-function total_length(paths::Vector{Vector{LLA{T}}}) where T
+function total_length(path::Vector{LLA{T}}) where T
     dist = 0.0
-    for path in paths
-        for (ps, pe) in zip(path[1:end-1], path[2:end])
-            dist += euclidean_distance(ps, pe)
-        end
+    for (ps, pe) in zip(path[1:end-1], path[2:end])
+        dist += euclidean_distance(ps, pe)
     end
     return dist
+end
+
+function total_length(paths::Vector{Vector{LLA{T}}}) where T
+    return sum(total_length(path for path in paths))
 end
 
 function total_length(parts::WalkedParts; filter_fct=(way)->true)

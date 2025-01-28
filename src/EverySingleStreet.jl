@@ -39,6 +39,8 @@ const DEFAULT_PREFERNECE_VALUE = Dict(
     "EXTEND_WALKED_WAY_UP_TO" => 10,
     "MAX_FILL_CYCLE_LENGTH" => 100,
     "MIN_FILL_CYCLE_PERC" => 30,
+    "MUL_NON_WALKABLE_ROAD" => 2.0,
+    "MUL_WALKED_ROAD" => 4.0,
 )
 
 include("gpx.jl")

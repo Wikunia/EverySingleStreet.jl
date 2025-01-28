@@ -19,12 +19,12 @@ function convert_to_weighted_graph(map::AbstractSimpleMap)
 end
 
 """
-    update_weights!(g::SimpleWeightedGraph, map::AbstractSimpleMap, walked_parts::WalkedParts; mul_non_walkable_road=2.5, mul_walked_road = 3.0)
+    update_weights!(g::SimpleWeightedGraph, map::AbstractSimpleMap, walked_parts::WalkedParts; mul_non_walkable_road=get_preference("MUL_NON_WALKABLE_ROAD"), mul_walked_road = get_preference("MUL_WALKED_ROAD"))
 
 Update the weights of the edges such that walked parts are "longer" in a shortest path calculation as well 
 as ways that are not classified as `iswalkable_road`. 
 """
-function update_weights!(g::SimpleWeightedGraph, map::AbstractSimpleMap, walked_parts::WalkedParts; mul_non_walkable_road=2.5, mul_walked_road = 3.0)
+function update_weights!(g::SimpleWeightedGraph, map::AbstractSimpleMap, walked_parts::WalkedParts; mul_non_walkable_road=get_preference("MUL_NON_WALKABLE_ROAD"), mul_walked_road = get_preference("MUL_WALKED_ROAD"))
     for way in map.ways
         if !iswalkable_road(way)
             for i in 1:(length(way.nodes) - 1)
@@ -55,6 +55,7 @@ function update_weights!(g::SimpleWeightedGraph, map::AbstractSimpleMap, walked_
         end
     end
 end
+
 
 """
     best_route(graph_data::Dict, src::LLA, dst::LLA)
