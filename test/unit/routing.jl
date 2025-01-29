@@ -41,4 +41,28 @@
     @test best_points[1] == from
     @test best_points[end] == to
     @test 300 <= EverySingleStreet.total_length(best_points) <= 350
+
+    path = [
+        LLA(51.811368,10.337099),
+        LLA(51.810917, 10.336504),
+        LLA(51.810548, 10.336252),
+        LLA(51.809935, 10.336069),
+    ]
+    times = [now()+i*Second(30) for i in 1:length(path)]
+    points = [EverySingleStreet.GPSPoint(p, ZonedDateTime(time, TimeZone("UTC"))) for (p, time) in zip(path, times)]
+
+    mapped = EverySingleStreet.map_matching(points, city_map, EverySingleStreet.WalkedParts(), "tmp_local_map.json");
+    rm("tmp_local_map.json")
+
+    best_points = EverySingleStreet.best_route(d, LLA(51.811368,10.337099), LLA(51.809935, 10.336069))
+    before_update = EverySingleStreet.total_length(best_points)
+
+    EverySingleStreet.update_weights!(nt.g, city_map, mapped.walked_parts; mul_non_walkable_road=20, mul_walked_road=20)
+    d = Dict(
+        "g" => nt.g,
+        "nodes" => nt.nodes,
+        "kd_tree" => nt.kd_tree,
+    )
+    best_points = EverySingleStreet.best_route(d, LLA(51.811368,10.337099), LLA(51.809935, 10.336069))
+    @test before_update <= EverySingleStreet.total_length(best_points) <= 20*before_update
 end
