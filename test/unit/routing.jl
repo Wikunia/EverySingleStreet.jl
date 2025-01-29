@@ -48,6 +48,12 @@
         LLA(51.810548, 10.336252),
         LLA(51.809935, 10.336069),
     ]
+    xdoc = EverySingleStreet.create_gpx_document(path)
+    xroot = LightXML.root(xdoc)
+    @test length(LightXML.get_elements_by_tagname(xroot, "trk")) == 1
+    free(xdoc)
+
+
     times = [now()+i*Second(30) for i in 1:length(path)]
     points = [EverySingleStreet.GPSPoint(p, ZonedDateTime(time, TimeZone("UTC"))) for (p, time) in zip(path, times)]
 
@@ -57,7 +63,13 @@
     best_points = EverySingleStreet.best_route(d, LLA(51.811368,10.337099), LLA(51.809935, 10.336069))
     before_update = EverySingleStreet.total_length(best_points)
 
+    id1 = nt.osm_id_to_node_id[30337960]
+    id2 = nt.osm_id_to_node_id[30337959]
+    old_dist = nt.g.weights[id1, id2]
     EverySingleStreet.update_weights!(nt.g, city_map, mapped.walked_parts; mul_non_walkable_road=20, mul_walked_road=20)
+   
+    @test 20*old_dist ≈ nt.g.weights[id1, id2]
+
     d = Dict(
         "g" => nt.g,
         "nodes" => nt.nodes,
