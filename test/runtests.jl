@@ -3,6 +3,7 @@ using Test
 
 using Dates
 using Geodesy
+using Graphs
 using TimeZones
 using LightXML
 
@@ -15,4 +16,5 @@ using LightXML
     include("unit/districts.jl")
     include("unit/drawing.jl")
     include("unit/update_walked_parts.jl")
+    include("unit/routing.jl")
 end

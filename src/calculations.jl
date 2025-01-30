@@ -13,6 +13,16 @@ function getxy(p::GPSPoint, trans)
     return x,y
 end
 
+function getxy(n::Node, trans)
+    x,y,z = trans(n.lla)
+    return x,y
+end
+
+function getxy(lla::LLA, trans)
+    x,y,z = trans(lla)
+    return x,y
+end
+
 """
     get_lla(p, trans)
 
@@ -485,21 +495,11 @@ end
 
 function get_local_map(city_map, gps_points, map_local_path)
     padding=get_preference("LOCAL_MAP_PADDING")
-    # build kd tree with gps points 
+   
     origin_lla = get_centroid(city_map.nodes)
-    trans = ENUfromLLA(origin_lla, wgs84)
-    transformed_points = Vector{Point2{Float64}}()
-    for point in gps_points
-        transformed_point = Point2(getxy_from_lat_lon(point.pos.lat, point.pos.lon, trans))
-        push!(transformed_points, transformed_point)
-    end
-    kd_tree = KDTree(transformed_points)
+    kd_tree = get_kd_tree_from_points(gps_points, origin_lla)
 
-    node_transformed_points = Vector{Point2{Float64}}()
-    for node in city_map.nodes
-        transformed_point = Point2(getxy_from_lat_lon(node.lat, node.lon, trans))
-        push!(node_transformed_points, transformed_point)
-    end
+    node_transformed_points = get_transformed_points(city_map.nodes, origin_lla)
     _, dists = nn(kd_tree, node_transformed_points)
     node_ids = findall(<=(padding), dists)
     create_local_json(city_map, node_ids, map_local_path)
@@ -859,14 +859,16 @@ function total_length(ways::Vector{Way}; filter_fct=(way)->true)
     return dist
 end
 
-function total_length(paths::Vector{Vector{LLA{T}}}) where T
+function total_length(path::Vector{LLA{T}}) where T
     dist = 0.0
-    for path in paths
-        for (ps, pe) in zip(path[1:end-1], path[2:end])
-            dist += euclidean_distance(ps, pe)
-        end
+    for (ps, pe) in zip(path[1:end-1], path[2:end])
+        dist += euclidean_distance(ps, pe)
     end
     return dist
+end
+
+function total_length(paths::Vector{Vector{LLA{T}}}) where T
+    return sum(total_length(path for path in paths))
 end
 
 function total_length(parts::WalkedParts; filter_fct=(way)->true)
@@ -1078,6 +1080,27 @@ function extend_walked_parts_cycle!(walked_parts)
     return walked_parts
 end
 
+"""
+    intersection(range1::Tuple{T, T}, range2::Tuple{T, T}) where T
+
+Return the intersection of the two ranges as a `Tuple{T, T}` or `nothing` if they don't intersect.
+"""
+function intersection(range1::Tuple{T, T}, range2::Tuple{T, T}) where T
+    intersection_start = max(range1[1], range2[1])
+    intersection_end = min(range1[2], range2[2])
+
+    if intersection_start <= intersection_end  # Check for actual intersection
+       return (intersection_start, intersection_end)
+    else 
+        return nothing
+    end
+end
+
+"""
+    merge_ranges(ranges::Vector{Tuple{T, T}}) where T
+
+Merge the given ranges together and return a new vector of merged ranges which are also sorted.
+"""
 function merge_ranges(ranges::Vector{Tuple{T, T}}) where T
     # sort the ranges by their start value
     sorted_ranges = sort(ranges, by = x -> x[1])
