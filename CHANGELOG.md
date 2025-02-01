@@ -8,6 +8,7 @@
     - This fixes a bug for which splitting still resulted in shortest path via non walkable
 ### Other
 - Fill some small gaps
+- Ability to do some routing calculations with updated weights based on already walked and whether it's counting towards the goal
 
 ## v0.1.2 (31st of December 2024)
 ### Bugfixes
