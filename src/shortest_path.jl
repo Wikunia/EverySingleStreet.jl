@@ -36,37 +36,70 @@ function bounded_dijkstra(graph, dist_mat, source, distance)
 end
 
 """
-    bounded_all_shortest_paths(osm_graph, distance, nodeid_to_local, is_walkable_road)
+    get_dist_mat_walkable(map, osm_graph, dist_mat::SparseMatrixCSC{Tv, Ti}) where {Tv, Ti}
+
+Set the distance for non walkable road ids to the highest value such that they will not be used. 
+"""
+function get_dist_mat_walkable(map, osm_graph, dist_mat::SparseMatrixCSC{Tv, Ti}) where {Tv, Ti}
+    dist_mat_walkable = deepcopy(dist_mat)
+    for way in map.ways 
+        iswalkable_road(way) && continue
+        nodes = way.nodes
+        for (i, j) in zip(1:length(nodes)-1,2:length(nodes)) 
+            idx1 = get(osm_graph.node_to_index, nodes[i].id, nothing)
+            idx2 = get(osm_graph.node_to_index, nodes[j].id, nothing)
+            if isnothing(idx1) || isnothing(idx2)
+                continue
+            end 
+            dist_mat_walkable[idx1, idx2] = typemax(Tv)
+            dist_mat_walkable[idx2, idx1] = typemax(Tv)
+        end
+    end
+    return dist_mat_walkable
+end
+
+"""
+    bounded_all_shortest_paths(map::AbstractSimpleMap, osm_graph, distance)
 
 Call [`bounded_dijkstra`](@ref) for all nodes and return a `BoundedAllShortestPaths` object.
 """
-function bounded_all_shortest_paths(osm_graph, distance, nodeid_to_local, is_walkable_road)
+function bounded_all_shortest_paths(map::AbstractSimpleMap, osm_graph, distance)
     g = osm_graph.graph
     dist_mat = osm_graph.weights
-    all_distances = Vector{Dict{Int32, Float64}}(undef, nv(g))
+    nodeid_to_local = map.osm_id_to_node_id
+    walkable_road_nodes = map.walkable_road_nodes
+    dist_mat_walkable = get_dist_mat_walkable(map, osm_graph, dist_mat)
+   
     all_parents = Vector{Dict{Int32, Int32}}(undef, nv(g))
+    all_parents_walable = Vector{Dict{Int32, Int32}}(undef, nv(g))
     @showprogress for i in 1:nv(g)
-        if !is_walkable_road[nodeid_to_local[osm_graph.index_to_node[i]]]
+        if !walkable_road_nodes[nodeid_to_local[osm_graph.index_to_node[i]]]
             # all_distances[i] = Dict{Int32, Float64}()
             # all_parents[i] = Dict{Int32, Int32}()
             continue
         end
         distances, parents = bounded_dijkstra(g, dist_mat, i, distance)
-        all_distances[i] = distances
+        distances, parents_walkable = bounded_dijkstra(g, dist_mat_walkable, i, distance)
         all_parents[i] = parents
+        all_parents_walable[i] = parents_walkable
     end
-    return BoundedAllShortestPaths(g, dist_mat, all_distances, all_parents, distance)
+    return BoundedAllShortestPaths(g, dist_mat, dist_mat_walkable, all_parents, all_parents_walable, distance)
 end
 
 """
-    get_shortest_path(bounded_shortest_paths::BoundedAllShortestPaths, from, to)
+    get_shortest_path(bounded_shortest_paths::BoundedAllShortestPaths, from, to; only_walkable_road=false)
 
 Return the same output as `a_star(g, from, to, dist_mat)` but use the cache from `BoundedAllShortestPaths`
 """
-function get_shortest_path(bounded_shortest_paths::BoundedAllShortestPaths, from, to)
+function get_shortest_path(bounded_shortest_paths::BoundedAllShortestPaths, from, to; only_walkable_road=false)
     g = bounded_shortest_paths.g
-    dist_mat = bounded_shortest_paths.dist_mat
-    parents = bounded_shortest_paths.parents[from]
+    if only_walkable_road
+        dist_mat = bounded_shortest_paths.dist_mat_walkable
+        parents = bounded_shortest_paths.parents_walkable[from]
+    else 
+        dist_mat = bounded_shortest_paths.dist_mat
+        parents = bounded_shortest_paths.parents[from]
+    end
     if !haskey(parents, to)
         return a_star(g, from, to, dist_mat)
     end
@@ -80,12 +113,12 @@ function get_shortest_path(bounded_shortest_paths::BoundedAllShortestPaths, from
 end
 
 """
-    get_shortest_path(city_map::Map, sp_from_id, sp_to_id)
+    get_shortest_path(city_map::Map, sp_from_id, sp_to_id; only_walkable_road=false)
 
 Return the shortest path from `from` to `to`. Has the same output as `shortest_path` from the LightOSM package 
 but uses the `BoundedAllShortestPaths` cache when it exists.
 """
-function get_shortest_path(city_map::Map, sp_from_id, sp_to_id)
+function get_shortest_path(city_map::Map, sp_from_id, sp_to_id; only_walkable_road=false)
     if sp_from_id == sp_to_id
         return [sp_from_id, sp_to_id]
     end
@@ -93,7 +126,7 @@ function get_shortest_path(city_map::Map, sp_from_id, sp_to_id)
     graph_from_id = osmgraph.node_to_index[sp_from_id]
     graph_to_id = osmgraph.node_to_index[sp_to_id]
     
-    edges = get_shortest_path(city_map.bounded_shortest_paths, graph_from_id, graph_to_id)
+    edges = get_shortest_path(city_map.bounded_shortest_paths, graph_from_id, graph_to_id; only_walkable_road)
     # if there is no path at all
     isempty(edges) && return nothing
     osm_vertices = Vector{Int}()

@@ -3,6 +3,7 @@ using Test
 
 using Dates
 using Geodesy
+using GeoJSON
 using Graphs
 using TimeZones
 using LightXML
