@@ -1,7 +1,7 @@
 name = "EverySingleStreet"
 uuid = "9a55513a-1f47-4b8f-a8c7-9585ec10e442"
 authors = ["Ole Kröger <o.kroeger@opensourc.es> and contributors"]
-version = "0.1.2"
+version = "0.1.3"
 
 [deps]
 Accessors = "7d9f7c33-5ae7-4f3b-8dc6-eff91059b697"

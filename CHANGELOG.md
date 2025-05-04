@@ -1,4 +1,4 @@
-## Unreleased
+## v0.1.3 (4th of May 2025)
 ### Bugfixes
 - In certain situations the gps points might be off 
 - The too fast check is only applied if the distance is over 50m
