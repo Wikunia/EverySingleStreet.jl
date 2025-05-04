@@ -87,6 +87,31 @@ function bounded_all_shortest_paths(map::AbstractSimpleMap, osm_graph, distance)
 end
 
 """
+    is_walkable_road_edge(map::Map, from, to)
+
+Return whether the edge from -> to is on a walkable road.
+"""
+function is_walkable_road_edge(map::Map, from, to)
+    graph_from_id = map.graph.node_to_index[from]
+    graph_to_id = map.graph.node_to_index[to]
+    dist_mat = map.bounded_shortest_paths.dist_mat_walkable
+    dist = dist_mat[graph_from_id, graph_to_id]
+    return !iszero(dist) && !isinf(dist)
+end
+
+"""
+    uses_any_non_walkable_road(map::Map, sp::Vector{Int})
+
+Return whether any of the edges in the shortest path `sp` are along a non walkable road.
+"""
+function uses_any_non_walkable_road(map::Map, sp::Vector{Int})
+    for i in 1:length(sp)-1
+        is_walkable_road_edge(map, sp[i], sp[i+1]) || return true
+    end
+    return false
+end
+
+"""
     get_shortest_path(bounded_shortest_paths::BoundedAllShortestPaths, from, to; only_walkable_road=false)
 
 Return the same output as `a_star(g, from, to, dist_mat)` but use the cache from `BoundedAllShortestPaths`
@@ -111,6 +136,7 @@ function get_shortest_path(bounded_shortest_paths::BoundedAllShortestPaths, from
     end
     return edges
 end
+
 
 """
     get_shortest_path(city_map::Map, sp_from_id, sp_to_id; only_walkable_road=false)

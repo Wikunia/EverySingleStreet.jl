@@ -667,7 +667,7 @@ function calculate_streetpath(name, subpath_id, candidates, city_map; allow_recu
                 continue
             end
             len_shortest_path =  total_length(city_map, sp)u"m"
-            any_non_walkable_road = any(nid->!city_map.walkable_road_nodes[city_map.osm_id_to_node_id[nid]], sp)
+            any_non_walkable_road = uses_any_non_walkable_road(city_map, sp)
             start_time = current_candidate.measured_point.time
             finish_time = next_candidate.measured_point.time
             duration = Quantity(finish_time - start_time)
