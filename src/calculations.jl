@@ -649,85 +649,77 @@ function calculate_streetpath(name, subpath_id, candidates, city_map; allow_recu
     for ci in 2:length(candidates)
         current_candidate = candidates[ci-1]
         next_candidate = candidates[ci]
-        if current_candidate.way.id == next_candidate.way.id
-            if current_candidate.way_is_reverse == next_candidate.way_is_reverse
-                push!(segments, StreetSegment(current_candidate, next_candidate))
-            else
-                next_candidate = get_reverse_candidate(next_candidate)
-                push!(segments, StreetSegment(current_candidate, next_candidate))
+        
+        sp = shortest_candidate_path(current_candidate, next_candidate, city_map)
+        if isnothing(sp)
+            if !isempty(segments)
+                push!(streetpaths, StreetPath(name, subpath_id, segments))
+            subpath_id += 1
+                segments = Vector{StreetSegment}()
             end
-        else
-            sp = shortest_candidate_path(current_candidate, next_candidate, city_map)
-            if isnothing(sp)
-                if !isempty(segments)
-                    push!(streetpaths, StreetPath(name, subpath_id, segments))
-                subpath_id += 1
-                    segments = Vector{StreetSegment}()
-                end
-                continue
-            end
-            len_shortest_path =  total_length(city_map, sp)u"m"
-            any_non_walkable_road = uses_any_non_walkable_road(city_map, sp)
-            start_time = current_candidate.measured_point.time
-            finish_time = next_candidate.measured_point.time
-            duration = Quantity(finish_time - start_time)
+            continue
+        end
+        len_shortest_path =  total_length(city_map, sp)u"m"
+        any_non_walkable_road = uses_any_non_walkable_road(city_map, sp)
+        start_time = current_candidate.measured_point.time
+        finish_time = next_candidate.measured_point.time
+        duration = Quantity(finish_time - start_time)
 
-            speed = uconvert(u"km/hr", len_shortest_path/duration)
+        speed = uconvert(u"km/hr", len_shortest_path/duration)
 
-            # don't check speed limit if the added amount is short
-            too_fast = speed > 20u"km/hr" && len_shortest_path > 50u"m"
+        # don't check speed limit if the added amount is short
+        too_fast = speed > 20u"km/hr" && len_shortest_path > 50u"m"
 
-            if !too_fast && any_non_walkable_road
-                sp_only_walkable = shortest_candidate_path(current_candidate, next_candidate, city_map; only_walkable_road=true)
-                if !isnothing(sp_only_walkable)
-                    len_sp_only_walkable =  total_length(city_map, sp_only_walkable)u"m"
-                    speed_only_walkable = uconvert(u"km/hr", len_sp_only_walkable/duration)
-                    too_fast_only_walkable = speed_only_walkable > 20u"km/hr" && len_sp_only_walkable > 50u"m"
-                    if !too_fast_only_walkable && len_sp_only_walkable - 2*get_preference("EXTEND_WALKED_WAY_UP_TO")u"m" <= len_shortest_path 
-                        sp = sp_only_walkable
-                        any_non_walkable_road = false
-                    end
+        if !too_fast && any_non_walkable_road
+            sp_only_walkable = shortest_candidate_path(current_candidate, next_candidate, city_map; only_walkable_road=true)
+            if !isnothing(sp_only_walkable)
+                len_sp_only_walkable =  total_length(city_map, sp_only_walkable)u"m"
+                speed_only_walkable = uconvert(u"km/hr", len_sp_only_walkable/duration)
+                too_fast_only_walkable = speed_only_walkable > 20u"km/hr" && len_sp_only_walkable > 50u"m"
+                if !too_fast_only_walkable && len_sp_only_walkable - 2*get_preference("EXTEND_WALKED_WAY_UP_TO")u"m" <= len_shortest_path 
+                    sp = sp_only_walkable
+                    any_non_walkable_road = false
                 end
             end
-            partial_segments = get_segments(city_map, current_candidate, next_candidate, sp)
-            
-            # if recursive is allowed and some of the shortest path are not via walkable roads 
-            # try to match those again to walkable roads
-            # also check if the shortest path is already too fast. If that is the case then this doesn't need to be computed
-            if !too_fast && allow_recursive && any_non_walkable_road
-                if !isempty(segments)
-                    push!(streetpaths, StreetPath(name, subpath_id, segments))
-                    subpath_id += 1
-                    segments = Vector{StreetSegment}()
-                end
-                nodes = [city_map.nodes[city_map.osm_id_to_node_id[nid]] for nid in sp]
-                points = [LLA(n.lat, n.lon) for n in nodes]
-                pushfirst!(points, current_candidate.measured_point.pos)
-                push!(points, next_candidate.measured_point.pos)
-                start_time = current_candidate.measured_point.time
-                finish_time = next_candidate.measured_point.time
-                duration = Quantity(finish_time - start_time)
-                len_shortest_path =  total_length(city_map, sp)u"m"
-                distances = [euclidean_distance(p1, p2)u"m" for (p1, p2) in zip(points[1:end-1], points[2:end])]
-                cum_dists = cumsum(distances)
-                pushfirst!(cum_dists, 0.0u"m")
-                times = start_time .+ ceil.(Second, [d/len_shortest_path * duration for d in cum_dists])
-                gps_points = [GPSPoint(p, t) for (p, t) in zip(points, times)]
-                extra_paths = map_matching(city_map, "extra_$ci", gps_points; allow_recursive=false, point_dist=0.0)
-                for extra_path in extra_paths
-                    push!(streetpaths, StreetPath(name, subpath_id, extra_path.segments))
-                    subpath_id += 1
-                end
-                continue
-            end
-         
-            if too_fast && !isempty(segments)
+        end
+        partial_segments = get_segments(city_map, current_candidate, next_candidate, sp)
+        
+        # if recursive is allowed and some of the shortest path are not via walkable roads 
+        # try to match those again to walkable roads
+        # also check if the shortest path is already too fast. If that is the case then this doesn't need to be computed
+        if !too_fast && allow_recursive && any_non_walkable_road
+            if !isempty(segments)
                 push!(streetpaths, StreetPath(name, subpath_id, segments))
                 subpath_id += 1
                 segments = Vector{StreetSegment}()
-            else
-                append!(segments, partial_segments)
             end
+            nodes = [city_map.nodes[city_map.osm_id_to_node_id[nid]] for nid in sp]
+            points = [LLA(n.lat, n.lon) for n in nodes]
+            pushfirst!(points, current_candidate.measured_point.pos)
+            push!(points, next_candidate.measured_point.pos)
+            start_time = current_candidate.measured_point.time
+            finish_time = next_candidate.measured_point.time
+            duration = Quantity(finish_time - start_time)
+            len_shortest_path =  total_length(city_map, sp)u"m"
+            distances = [euclidean_distance(p1, p2)u"m" for (p1, p2) in zip(points[1:end-1], points[2:end])]
+            cum_dists = cumsum(distances)
+            pushfirst!(cum_dists, 0.0u"m")
+            times = start_time .+ ceil.(Second, [d/len_shortest_path * duration for d in cum_dists])
+            gps_points = [GPSPoint(p, t) for (p, t) in zip(points, times)]
+            extra_paths = map_matching(city_map, "extra_$ci", gps_points; allow_recursive=false, point_dist=0.0)
+            for extra_path in extra_paths
+                push!(streetpaths, StreetPath(name, subpath_id, extra_path.segments))
+                subpath_id += 1
+            end
+            continue
+        end
+        
+        if too_fast && !isempty(segments)
+            push!(streetpaths, StreetPath(name, subpath_id, segments))
+            subpath_id += 1
+            segments = Vector{StreetSegment}()
+        else
+            append!(segments, partial_segments)
         end
     end
     if !isempty(segments)

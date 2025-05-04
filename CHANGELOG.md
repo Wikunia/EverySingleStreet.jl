@@ -7,6 +7,7 @@
 - Shortest path has non walkable roads is now fixed earlier by using shortest path only walkable calculation
     - This fixes a bug for which splitting still resulted in shortest path via non walkable
 - If candidates can be connected via two walkable nodes but via a non walkable road the calculation had a bug
+- If candidates where on the same way id it doesn't mean they have to be shortest connected via that way
 ### Other
 - Fill some small gaps
 - Ability to do some routing calculations with updated weights based on already walked and whether it's counting towards the goal
